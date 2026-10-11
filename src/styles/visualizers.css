@@ -1,0 +1,363 @@
+/* Visualizer Container */
+.visualizer-container {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  margin: 2rem 0;
+}
+
+.visualizer-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.2);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.visualizer-title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.visualizer-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.visualizer-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.visualizer-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.visualizer-body {
+  padding: 1.5rem;
+}
+
+/* Romania Graph SVG Styling */
+.romania-svg-wrapper {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 520px;
+  background: radial-gradient(circle at 60% 40%, rgba(15, 23, 42, 0.7), rgba(8, 11, 17, 0.95));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.graph-edge {
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 2;
+  transition: all 0.3s ease;
+}
+
+.graph-edge.solution {
+  stroke: #f59e0b;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));
+}
+
+.graph-edge-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  fill: #64748b;
+  font-weight: 600;
+  user-select: none;
+}
+
+.city-circle {
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.city-circle.default {
+  fill: #1e293b;
+  stroke: #475569;
+  stroke-width: 2;
+}
+
+.city-circle.frontier {
+  fill: #d97706;
+  stroke: #fbbf24;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.7));
+}
+
+.city-circle.current {
+  fill: #0284c7;
+  stroke: #38bdf8;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.9));
+}
+
+.city-circle.explored {
+  fill: #312e81;
+  stroke: #6366f1;
+  stroke-width: 2;
+  opacity: 0.7;
+}
+
+.city-circle.goal {
+  fill: #059669;
+  stroke: #34d399;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.9));
+}
+
+.city-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  fill: #f8fafc;
+  user-select: none;
+  pointer-events: none;
+}
+
+.city-heuristic {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: #f59e0b;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 8-Puzzle Grid */
+.puzzle-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 260px;
+  height: 260px;
+  background: #0b0f17;
+  padding: 10px;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--border-medium);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.6);
+  user-select: none;
+  margin: 0 auto;
+}
+
+.puzzle-tile {
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #f8fafc;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #020617, inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.puzzle-tile:hover {
+  background: linear-gradient(135deg, #334155, #1e293b);
+  transform: translateY(-2px);
+}
+
+.puzzle-tile:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #020617;
+}
+
+.puzzle-tile.blank {
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  cursor: default;
+}
+
+.puzzle-tile.correct-pos {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #34d399;
+}
+
+/* Vacuum World Simulator */
+.vacuum-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  max-width: 600px;
+  margin: 1.5rem auto;
+}
+
+.vacuum-room {
+  background: var(--bg-card);
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  min-height: 200px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.vacuum-room.has-robot {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.2);
+}
+
+.dirt-indicator {
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.dirt-indicator.dirty {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.dirt-indicator.clean {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Water Jugs Visualizer */
+.jug-container {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3rem;
+  margin: 2rem 0;
+}
+
+.water-jug {
+  width: 110px;
+  border: 3px solid #38bdf8;
+  border-top: none;
+  border-radius: 0 0 16px 16px;
+  background: rgba(56, 189, 248, 0.05);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 6px 16px rgba(56, 189, 248, 0.15);
+}
+
+.water-level {
+  width: 100%;
+  background: linear-gradient(180deg, #38bdf8, #0284c7);
+  position: absolute;
+  bottom: 0;
+  transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 -2px 8px rgba(56, 189, 248, 0.4);
+}
+
+.water-marks {
+  position: absolute;
+  right: 4px;
+  inset-block: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  pointer-events: none;
+  padding: 4px 0;
+}
+
+/* 8-Queens Chessboard */
+.chessboard {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  width: 320px;
+  height: 320px;
+  border: 2px solid var(--border-medium);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 1.5rem auto;
+}
+
+.chess-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.chess-cell.light {
+  background: #1e293b;
+}
+
+.chess-cell.dark {
+  background: #0f172a;
+}
+
+.chess-cell.conflict {
+  background: rgba(244, 63, 94, 0.3) !important;
+}
+
+.chess-cell:hover {
+  background: #334155;
+}
+
+/* Pancake Flipper */
+.pancake-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 1.5rem auto;
+  max-width: 320px;
+}
+
+.pancake-item {
+  height: 38px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: #1e293b;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.pancake-size-4 {
+  width: 280px;
+  background: #f59e0b;
+}
+.pancake-size-3 {
+  width: 220px;
+  background: #fbbf24;
+}
+.pancake-size-2 {
+  width: 160px;
+  background: #fcd34d;
+}
+.pancake-size-1 {
+  width: 100px;
+  background: #fef08a;
+}
