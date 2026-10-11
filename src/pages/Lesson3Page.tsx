@@ -7,6 +7,7 @@ import { EightPuzzleVisualizer } from '../components/visualizers/EightPuzzleVisu
 import { AStarProofVisualizer } from '../components/visualizers/AStarProofVisualizer';
 import { EffectiveBranchingFactor } from '../components/visualizers/EffectiveBranchingFactor';
 import { PancakeVisualizer } from '../components/visualizers/PancakeVisualizer';
+import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 
 export const Lesson3Page: React.FC<{ activeSectionId?: string }> = ({ activeSectionId }) => {
   const { progress, markSectionComplete, toggleBookmark, isBookmarked, setLastVisited } = useStudy();
@@ -140,16 +141,7 @@ export const Lesson3Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    fontSize: '0.88rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.7,
-                    whiteSpace: 'pre-line',
-                  }}
-                >
-                  {sec.content}
-                </div>
+                <MarkdownRenderer content={sec.content} />
 
                 {/* Interactive A* Romania search visualizer */}
                 {sec.id === 'astar-mechanics-and-romania-trace' && (
