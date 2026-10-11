@@ -8,6 +8,7 @@ import { MissionariesVisualizer } from '../components/visualizers/MissionariesVi
 import { WaterJugsVisualizer } from '../components/visualizers/WaterJugsVisualizer';
 import { EightQueensVisualizer } from '../components/visualizers/EightQueensVisualizer';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { AgentDiagram } from '../components/diagrams/AgentDiagram';
 
 export const Lesson2Page: React.FC<{ activeSectionId?: string }> = ({ activeSectionId }) => {
   const { progress, markSectionComplete, toggleBookmark, isBookmarked, setLastVisited } = useStudy();
@@ -142,6 +143,11 @@ export const Lesson2Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
                 </div>
 
                 <MarkdownRenderer content={sec.content} />
+
+                {/* Interactive SVG Agent-Environment Diagram */}
+                {sec.id === 'agent-function-model' && (
+                  <AgentDiagram />
+                )}
 
                 {/* Vacuum World Simulator in Section 2 */}
                 {sec.id === 'vacuum-cleaner-world' && (
