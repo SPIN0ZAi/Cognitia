@@ -64,6 +64,8 @@ export const ProgressPage: React.FC<{
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   marginBottom: '0.65rem',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem',
                 }}
               >
                 <div>

@@ -74,6 +74,7 @@ export const PracticePage: React.FC<{
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             gap: '0.5rem',
             padding: '0.4rem',
             background: 'var(--bg-surface)',
@@ -85,18 +86,18 @@ export const PracticePage: React.FC<{
           <button
             onClick={() => setPracticeTab('quiz')}
             className={`btn-tactile btn-sm ${practiceTab === 'quiz' ? 'btn-primary' : ''}`}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            style={{ flex: '1 1 240px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
           >
             <BookOpen size={14} />
-            <span>Multiple Choice & Calculation Questions (15 Questions)</span>
+            <span>Multiple Choice &amp; Calculation Questions</span>
           </button>
           <button
             onClick={() => setPracticeTab('romania')}
             className={`btn-tactile btn-sm ${practiceTab === 'romania' ? 'btn-amber' : ''}`}
-            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+            style={{ flex: '1 1 240px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
           >
             <Compass size={14} />
-            <span>Romania Route Search Interactive Exam Trainer</span>
+            <span>Romania Route Search Exam Trainer</span>
           </button>
         </div>
 

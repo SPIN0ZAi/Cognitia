@@ -276,7 +276,7 @@ export const CourseHomePage: React.FC<{
       </section>
 
       {/* Telemetry Dashboard: Next Recommended Mission + Progress Metrics */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
         {/* Next Recommended Mission Card */}
         <div
           className="card"

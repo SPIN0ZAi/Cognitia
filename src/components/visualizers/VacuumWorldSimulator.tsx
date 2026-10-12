@@ -263,6 +263,7 @@ export const VacuumWorldSimulator: React.FC = () => {
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             gap: '0.5rem',
             marginBottom: '1.25rem',
             padding: '0.4rem',
@@ -277,7 +278,7 @@ export const VacuumWorldSimulator: React.FC = () => {
               setIsRunning(false);
             }}
             className={`btn-tactile btn-sm ${mode === 'reflex' ? 'btn-primary' : ''}`}
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 180px' }}
           >
             Reflex Agent Mode (Slide 6)
           </button>
@@ -287,7 +288,7 @@ export const VacuumWorldSimulator: React.FC = () => {
               setIsRunning(false);
             }}
             className={`btn-tactile btn-sm ${mode === 'manual' ? 'btn-primary' : ''}`}
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 180px' }}
           >
             Manual Actions Mode
           </button>
@@ -299,14 +300,14 @@ export const VacuumWorldSimulator: React.FC = () => {
               setBlindStepIndex(0);
             }}
             className={`btn-tactile btn-sm ${mode === 'belief' ? 'btn-amber' : ''}`}
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 180px' }}
           >
             Unknown Initial State / Belief States (Slide 12)
           </button>
         </div>
 
         {/* Dual Layout: Physical Grid + 8-State Space Transition Graph */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
           {/* Left Column: Physical Environment & Controls */}
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', color: '#f8fafc' }}>

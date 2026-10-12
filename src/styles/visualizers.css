@@ -287,12 +287,13 @@
 .chessboard {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
-  width: 320px;
-  height: 320px;
+  width: min(320px, calc(100vw - 2.5rem));
+  height: min(320px, calc(100vw - 2.5rem));
+  aspect-ratio: 1 / 1;
   border: 2px solid var(--border-medium);
   border-radius: var(--radius-md);
   overflow: hidden;
-  margin: 1.5rem auto;
+  margin: 1.25rem auto;
 }
 
 .chess-cell {
@@ -360,4 +361,104 @@
 .pancake-size-1 {
   width: 100px;
   background: #fef08a;
+}
+
+/* Visualizer Mobile Responsiveness */
+@media (max-width: 768px) {
+  .visualizer-container {
+    margin: 1.25rem 0;
+    border-radius: var(--radius-lg);
+  }
+
+  .visualizer-header {
+    padding: 0.85rem 1rem;
+    gap: 0.6rem;
+  }
+
+  .visualizer-body {
+    padding: 1rem;
+  }
+
+  .romania-svg-wrapper {
+    aspect-ratio: 4 / 3;
+    max-height: 380px;
+  }
+
+  .puzzle-board {
+    width: min(300px, calc(100vw - 3rem));
+    height: min(300px, calc(100vw - 3rem));
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .puzzle-tile {
+    font-size: 1.25rem;
+  }
+
+  .jug-container {
+    gap: 1.5rem;
+    margin: 1.25rem 0;
+  }
+
+  .water-jug {
+    width: 95px;
+  }
+}
+
+@media (max-width: 540px) {
+  .visualizer-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .visualizer-body {
+    padding: 0.75rem;
+  }
+
+  .vacuum-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .vacuum-room {
+    min-height: 130px;
+    padding: 0.85rem;
+  }
+
+  .pancake-stack {
+    max-width: 100%;
+    padding: 0 0.5rem;
+  }
+
+  .pancake-size-4 {
+    width: min(280px, 92%);
+  }
+  .pancake-size-3 {
+    width: min(220px, 78%);
+  }
+  .pancake-size-2 {
+    width: min(160px, 62%);
+  }
+  .pancake-size-1 {
+    width: min(100px, 46%);
+  }
+
+  /* River crossing stage on phones */
+  .river-crossing-stage {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    padding: 1rem 0.75rem !important;
+  }
+
+  .river-bank {
+    width: 100% !important;
+    padding: 0.75rem !important;
+  }
+
+  .river-water {
+    width: 100% !important;
+    height: 75px !important;
+  }
 }

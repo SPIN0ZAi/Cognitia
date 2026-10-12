@@ -53,6 +53,15 @@ export function AppContent() {
         onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
+      {/* Mobile Drawer Backdrop Overlay */}
+      {mobileSidebarOpen && (
+        <div
+          className="sidebar-mobile-overlay"
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Main Container */}
       <div className="main-content">
         <Header

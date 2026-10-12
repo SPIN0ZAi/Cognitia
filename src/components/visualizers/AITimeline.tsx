@@ -305,7 +305,7 @@ export const AITimeline: React.FC = () => {
         </div>
 
         {/* Chronological Archival Stage (Dual View: Featured Landmark + Scrubbable Timeline Rail) */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem', marginBottom: '1rem' }}>
           {/* Featured Historical Document / Landmark Card */}
           <div
             className="card"

@@ -119,6 +119,7 @@ export const MissionariesVisualizer: React.FC = () => {
       <div className="visualizer-body">
         {/* River Graphic Scene */}
         <div
+          className="river-crossing-stage"
           style={{
             background: 'linear-gradient(180deg, #0f172a, #080b11)',
             border: '1px solid var(--border-medium)',
@@ -133,6 +134,7 @@ export const MissionariesVisualizer: React.FC = () => {
         >
           {/* Left Bank */}
           <div
+            className="river-bank"
             style={{
               width: '32%',
               background: 'rgba(30, 41, 59, 0.7)',
@@ -156,6 +158,7 @@ export const MissionariesVisualizer: React.FC = () => {
 
           {/* River & Boat */}
           <div
+            className="river-water"
             style={{
               flex: 1,
               height: '110px',
@@ -186,6 +189,7 @@ export const MissionariesVisualizer: React.FC = () => {
 
           {/* Right Bank */}
           <div
+            className="river-bank"
             style={{
               width: '32%',
               background: 'rgba(30, 41, 59, 0.7)',

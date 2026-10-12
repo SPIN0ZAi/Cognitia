@@ -389,5 +389,92 @@ code, pre, .font-mono {
 @media (max-width: 900px) {
   .grid-2, .grid-3 {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
+}
+
+/* Comprehensive Mobile Responsiveness */
+@media (max-width: 768px) {
+  .page-wrapper {
+    padding: 1.25rem 1rem 5rem;
+  }
+
+  .card {
+    padding: 1.15rem;
+  }
+
+  .archival-quote {
+    padding: 0.85rem 1rem;
+    font-size: 0.95rem;
+  }
+
+  h1 {
+    font-size: clamp(1.6rem, 5vw, 2.2rem) !important;
+  }
+
+  h2 {
+    font-size: clamp(1.2rem, 4vw, 1.55rem) !important;
+  }
+
+  h3 {
+    font-size: clamp(1.05rem, 3.5vw, 1.25rem) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-wrapper {
+    padding: 1rem 0.75rem 4rem;
+  }
+
+  .card {
+    padding: 0.95rem;
+    border-radius: var(--radius-md);
+  }
+
+  .badge {
+    font-size: 0.62rem;
+    padding: 0.15rem 0.4rem;
+  }
+
+  .slide-citation {
+    font-size: 0.64rem;
+  }
+}
+
+/* Touch Device Ergonomics & Cursor Management */
+@media (pointer: coarse), (hover: none) {
+  .magnetic-cursor-ring,
+  .magnetic-cursor-dot {
+    display: none !important;
+  }
+
+  .btn-tactile {
+    min-height: 38px;
+    touch-action: manipulation;
+  }
+
+  .btn-tactile.btn-sm {
+    min-height: 32px;
+  }
+
+  /* Prevent sticky hover styles on mobile tap */
+  .btn-tactile:hover {
+    transform: none;
+  }
+}
+
+/* Fluid Tables, Math, and KaTeX Overflow Management */
+.katex-display,
+.math-block {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-collapse: collapse;
 }
