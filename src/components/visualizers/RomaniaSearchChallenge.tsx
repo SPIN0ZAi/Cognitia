@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ROMANIA_GRAPH } from '../../data/romaniaData';
 import type { SearchAlgorithmType, SearchStepNode } from '../../types/graph';
+import { selectNextNode } from '../../lib/search/GraphSearch';
+import type { SearchNode } from '../../lib/search/GraphSearch';
 import { Shuffle, RotateCcw, CheckCircle2, XCircle, Lightbulb, Trophy, ArrowRight, Award, Flame } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -99,25 +101,22 @@ export const RomaniaSearchChallenge: React.FC = () => {
   // Determine which node SHOULD be chosen next according to the algorithm rules
   const getExpectedNextNode = (): SearchStepNode | null => {
     if (state.frontier.length === 0) return null;
-    const sorted = [...state.frontier];
+    const genericNodes: SearchNode<string>[] = state.frontier.map((n) => ({
+      id: n.id,
+      state: n.state,
+      stateKey: n.state,
+      parent: null,
+      parentId: n.parentId,
+      action: n.action,
+      g: n.g,
+      h: n.h,
+      f: n.f,
+      depth: n.depth,
+    }));
 
-    if (state.algorithm === 'bfs') {
-      // FIFO: shallowest depth, first inserted
-      return sorted[0];
-    } else if (state.algorithm === 'ucs') {
-      // Lowest g(n)
-      sorted.sort((a, b) => a.g - b.g);
-      return sorted[0];
-    } else if (state.algorithm === 'greedy') {
-      // Lowest h(n)
-      sorted.sort((a, b) => a.h - b.h);
-      return sorted[0];
-    } else if (state.algorithm === 'astar') {
-      // Lowest f(n) = g(n) + h(n), tie-break on h(n)
-      sorted.sort((a, b) => a.f - b.f || a.h - b.h);
-      return sorted[0];
-    }
-    return sorted[0];
+    const selection = selectNextNode(genericNodes, state.algorithm as any);
+    if (!selection) return null;
+    return state.frontier.find((n) => n.id === selection.selected.id) || null;
   };
 
   const expectedNode = getExpectedNextNode();

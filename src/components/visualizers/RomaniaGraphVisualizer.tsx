@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { ROMANIA_GRAPH } from '../../data/romaniaData';
 import type { SearchAlgorithmType, SearchStepNode } from '../../types/graph';
+import { InteractiveSearchSession } from '../../lib/search/GraphSearch';
+import type {
+  GraphSearchProblem,
+  SearchStepSnapshot,
+} from '../../lib/search/GraphSearch';
 import { Compass, Trophy } from 'lucide-react';
 import { RomaniaSearchChallenge } from './RomaniaSearchChallenge';
 import {
@@ -9,18 +14,6 @@ import {
   PseudocodeViewer,
   StatusLed,
 } from '../common/InstrumentControls';
-
-interface SearchSnapshot {
-  frontier: SearchStepNode[];
-  explored: string[];
-  currentNode: SearchStepNode | null;
-  solutionPath: string[] | null;
-  totalCost: number;
-  stepCount: number;
-  isFinished: boolean;
-  statusMessage: string;
-  activeLineIndex: number;
-}
 
 const PSEUDOCODE_LINES: Record<SearchAlgorithmType, string[]> = {
   astar: [
@@ -117,40 +110,91 @@ export const RomaniaGraphVisualizer: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('Initialized search laboratory radar.');
   const [activeLineIndex, setActiveLineIndex] = useState(0);
 
-  // History stack for stepping backwards
-  const [history, setHistory] = useState<SearchSnapshot[]>([]);
+  // Interactive session from unified GraphSearch engine
+  const sessionRef = useRef<InteractiveSearchSession<string> | null>(null);
 
   // Animation playback
   const [isPlaying, setIsPlaying] = useState(false);
   const [speedMs, setSpeedMs] = useState(750);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const applySnapshot = (snap: SearchStepSnapshot<string>) => {
+    setFrontier(
+      snap.frontier.map((n) => ({
+        id: n.id,
+        state: n.state,
+        parentId: n.parentId,
+        action: n.action,
+        g: n.g,
+        h: n.h,
+        f: n.f,
+        depth: n.depth,
+        status: 'frontier' as const,
+      }))
+    );
+    setExplored(snap.explored);
+    setCurrentNode(
+      snap.currentNode
+        ? {
+            id: snap.currentNode.id,
+            state: snap.currentNode.state,
+            parentId: snap.currentNode.parentId,
+            action: snap.currentNode.action,
+            g: snap.currentNode.g,
+            h: snap.currentNode.h,
+            f: snap.currentNode.f,
+            depth: snap.currentNode.depth,
+            status: 'current' as const,
+          }
+        : null
+    );
+    setSolutionPath(snap.solutionPath);
+    setTotalCost(snap.totalCost);
+    setStepCount(snap.stepCount);
+    setIsFinished(snap.isFinished);
+    setStatusMessage(snap.statusMessage);
+    setActiveLineIndex(snap.activeLineIndex);
+  };
+
   // Initialize or reset search
   const resetSearch = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setIsPlaying(false);
 
-    const rootH = ROMANIA_GRAPH[startCity]?.straightLineToBucharest || 0;
-    const rootNode: SearchStepNode = {
-      id: `${startCity}-0`,
-      state: startCity,
-      g: 0,
-      h: rootH,
-      f: selectedAlgo === 'greedy' ? rootH : selectedAlgo === 'ucs' ? 0 : rootH,
-      depth: 0,
-      status: 'frontier',
+    const problem: GraphSearchProblem<string> = {
+      initialState: startCity,
+      isGoal: (city) => city === goalCity,
+      getSuccessors: (city) => {
+        const data = ROMANIA_GRAPH[city];
+        if (!data) return [];
+        return data.connections.map((c) => ({
+          state: c.target,
+          cost: c.cost,
+          action: `Road to ${c.target}`,
+        }));
+      },
+      getHeuristic: (city) => {
+        if (city === goalCity) return 0;
+        if (goalCity === 'Bucharest' && ROMANIA_GRAPH[city]?.straightLineToBucharest !== undefined) {
+          return ROMANIA_GRAPH[city].straightLineToBucharest;
+        }
+        const cA = ROMANIA_GRAPH[city];
+        const cG = ROMANIA_GRAPH[goalCity];
+        if (!cA || !cG) return 0;
+        const dx = cA.x - cG.x;
+        const dy = cA.y - cG.y;
+        return Math.round(Math.sqrt(dx * dx + dy * dy) * 0.6025);
+      },
+      stateKey: (city) => city,
     };
 
-    setFrontier([rootNode]);
-    setExplored([]);
-    setCurrentNode(null);
-    setSolutionPath(null);
-    setTotalCost(0);
-    setStepCount(0);
-    setIsFinished(false);
-    setStatusMessage(`Initialized search radar from ${startCity} to ${goalCity} using ${selectedAlgo.toUpperCase()}.`);
-    setActiveLineIndex(0);
-    setHistory([]);
+    const algoType = (selectedAlgo === 'ids' ? 'dls' : selectedAlgo) as any;
+    const session = new InteractiveSearchSession(problem, algoType, {
+      isGraphMode,
+      depthLimit,
+    });
+    sessionRef.current = session;
+    applySnapshot(session.getSnapshot());
   };
 
   useEffect(() => {
@@ -159,143 +203,21 @@ export const RomaniaGraphVisualizer: React.FC = () => {
 
   // Execute one step of search
   const stepSearch = () => {
-    if (isFinished || frontier.length === 0) {
-      if (frontier.length === 0 && !isFinished) {
-        setIsFinished(true);
-        setStatusMessage('Search frontier exhausted: Target node unreachable.');
-      }
+    if (!sessionRef.current) return;
+    const snap = sessionRef.current.step();
+    applySnapshot(snap);
+    if (snap.isFinished) {
       setIsPlaying(false);
-      return;
-    }
-
-    // Save snapshot to history
-    setHistory((prev) => [
-      ...prev,
-      {
-        frontier: [...frontier],
-        explored: [...explored],
-        currentNode,
-        solutionPath,
-        totalCost,
-        stepCount,
-        isFinished,
-        statusMessage,
-        activeLineIndex,
-      },
-    ]);
-
-    // Priority ordering
-    let nextFrontier = [...frontier];
-    let selected: SearchStepNode;
-
-    if (selectedAlgo === 'bfs') {
-      selected = nextFrontier.shift()!;
-    } else if (selectedAlgo === 'dfs') {
-      selected = nextFrontier.pop()!;
-    } else if (selectedAlgo === 'ucs') {
-      nextFrontier.sort((a, b) => a.g - b.g);
-      selected = nextFrontier.shift()!;
-    } else if (selectedAlgo === 'greedy') {
-      nextFrontier.sort((a, b) => a.h - b.h);
-      selected = nextFrontier.shift()!;
-    } else if (selectedAlgo === 'astar') {
-      nextFrontier.sort((a, b) => a.f - b.f || a.h - b.h);
-      selected = nextFrontier.shift()!;
-    } else if (selectedAlgo === 'dls') {
-      selected = nextFrontier.pop()!;
-    } else {
-      nextFrontier.sort((a, b) => a.f - b.f);
-      selected = nextFrontier.shift()!;
-    }
-
-    // Explored set skip
-    if (isGraphMode && explored.includes(selected.state)) {
-      setFrontier(nextFrontier);
-      setStatusMessage(`Cycle detected: ${selected.state} already in explored set.`);
-      setActiveLineIndex(4);
-      return;
-    }
-
-    setCurrentNode(selected);
-    const newExplored = isGraphMode ? [...explored, selected.state] : explored;
-    setExplored(newExplored);
-    setStepCount((prev) => prev + 1);
-    setActiveLineIndex(2);
-
-    // Goal test
-    if (selected.state === goalCity) {
-      setIsFinished(true);
-      setIsPlaying(false);
-      setTotalCost(selected.g);
-      setActiveLineIndex(3);
-
-      setSolutionPath([startCity, ...((selected.state !== startCity) ? [selected.state] : [])]);
-      setStatusMessage(`Goal reached! Optimal path to ${goalCity} found with cost ${selected.g} km.`);
-      return;
-    }
-
-    // Depth check for DLS
-    if (selectedAlgo === 'dls' && selected.depth >= depthLimit) {
-      setFrontier(nextFrontier);
-      setStatusMessage(`Depth cutoff: limit ${depthLimit} reached at ${selected.state}.`);
-      setActiveLineIndex(4);
-      return;
-    }
-
-    // Successor expansion
-    const cityData = ROMANIA_GRAPH[selected.state];
-    if (cityData) {
-      const generatedChildren: SearchStepNode[] = [];
-
-      cityData.connections.forEach((conn) => {
-        if (isGraphMode && newExplored.includes(conn.target)) return;
-
-        const childG = selected.g + conn.cost;
-        const childH = ROMANIA_GRAPH[conn.target]?.straightLineToBucharest || 0;
-        const childF =
-          selectedAlgo === 'greedy'
-            ? childH
-            : selectedAlgo === 'ucs'
-            ? childG
-            : childG + childH;
-
-        const childNode: SearchStepNode = {
-          id: `${conn.target}-${stepCount + 1}-${Math.random().toString(36).substring(2, 5)}`,
-          state: conn.target,
-          parentId: selected.id,
-          action: `Road to ${conn.target}`,
-          g: childG,
-          h: childH,
-          f: childF,
-          depth: selected.depth + 1,
-          status: 'frontier',
-        };
-
-        generatedChildren.push(childNode);
-      });
-
-      nextFrontier = [...nextFrontier, ...generatedChildren];
-      setFrontier(nextFrontier);
-      setStatusMessage(`Extracted ${selected.state} (g=${selected.g}, h=${selected.h}, f=${selected.f}). Generated ${generatedChildren.length} child nodes.`);
-      setActiveLineIndex(6);
     }
   };
 
   // Step backwards using history snapshot
   const stepBackward = () => {
-    if (history.length === 0) return;
-    const lastSnap = history[history.length - 1];
-    setHistory((prev) => prev.slice(0, prev.length - 1));
-
-    setFrontier(lastSnap.frontier);
-    setExplored(lastSnap.explored);
-    setCurrentNode(lastSnap.currentNode);
-    setSolutionPath(lastSnap.solutionPath);
-    setTotalCost(lastSnap.totalCost);
-    setStepCount(lastSnap.stepCount);
-    setIsFinished(lastSnap.isFinished);
-    setStatusMessage(lastSnap.statusMessage);
-    setActiveLineIndex(lastSnap.activeLineIndex);
+    if (!sessionRef.current) return;
+    const snap = sessionRef.current.stepBack();
+    if (snap) {
+      applySnapshot(snap);
+    }
   };
 
   // Autoplay loop
@@ -518,7 +440,7 @@ export const RomaniaGraphVisualizer: React.FC = () => {
             speedMs={speedMs}
             onSpeedChange={setSpeedMs}
             canStepForward={!isFinished && frontier.length > 0}
-            canStepBackward={history.length > 0}
+            canStepBackward={stepCount > 0}
             stepCount={stepCount}
           />
         </div>
@@ -554,10 +476,17 @@ export const RomaniaGraphVisualizer: React.FC = () => {
               city.connections.map((conn) => {
                 const targetCity = ROMANIA_GRAPH[conn.target];
                 if (!targetCity || cityName > conn.target) return null;
-                const isSolEdge =
-                  solutionPath &&
-                  solutionPath.includes(cityName) &&
-                  solutionPath.includes(conn.target);
+                const isSolEdge = (() => {
+                  if (!solutionPath || solutionPath.length < 2) return false;
+                  for (let i = 0; i < solutionPath.length - 1; i++) {
+                    const a = solutionPath[i];
+                    const b = solutionPath[i + 1];
+                    if ((a === cityName && b === conn.target) || (b === cityName && a === conn.target)) {
+                      return true;
+                    }
+                  }
+                  return false;
+                })();
 
                 const midX = (city.x + targetCity.x) / 2;
                 const midY = (city.y + targetCity.y) / 2;
