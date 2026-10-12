@@ -7,6 +7,7 @@ import { EightPuzzleVisualizer } from '../components/visualizers/EightPuzzleVisu
 import { AStarProofVisualizer } from '../components/visualizers/AStarProofVisualizer';
 import { EffectiveBranchingFactor } from '../components/visualizers/EffectiveBranchingFactor';
 import { PancakeVisualizer } from '../components/visualizers/PancakeVisualizer';
+import { EightPuzzleGreedyTrace } from '../components/visualizers/EightPuzzleGreedyTrace';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 
 export const Lesson3Page: React.FC<{ activeSectionId?: string }> = ({ activeSectionId }) => {
@@ -199,23 +200,9 @@ export const Lesson3Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
           <PancakeVisualizer />
         </div>
 
-        {/* Exercise 2: 8-Puzzle Greedy Search Trace */}
-        <div className="card" style={{ padding: '1.75rem', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-            <span className="badge badge-amber font-mono">Exercise 2: 8-Puzzle Greedy Best-First</span>
-            <span className="slide-citation">Slide 55</span>
-          </div>
-
-          <p style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '1rem', color: '#f8fafc' }}>
-            {LESSON_3_DATA.proposedExercises[1].problemStatement}
-          </p>
-
-          <div className="quiz-explanation-box">
-            <strong style={{ color: '#fff' }}>Detailed Step-by-Step Operator Trace:</strong>
-            <p style={{ marginTop: '0.35rem', color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.5, whiteSpace: 'pre-line' }}>
-              {LESSON_3_DATA.proposedExercises[1].solutionExplanation}
-            </p>
-          </div>
+        {/* Exercise 2: 8-Puzzle Greedy Search Interactive Trace */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <EightPuzzleGreedyTrace />
         </div>
       </section>
     </div>

@@ -9,6 +9,7 @@ import { WaterJugsVisualizer } from '../components/visualizers/WaterJugsVisualiz
 import { EightQueensVisualizer } from '../components/visualizers/EightQueensVisualizer';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 import { AgentDiagram } from '../components/diagrams/AgentDiagram';
+import { PeasExplorer } from '../components/visualizers/PeasExplorer';
 
 export const Lesson2Page: React.FC<{ activeSectionId?: string }> = ({ activeSectionId }) => {
   const { progress, markSectionComplete, toggleBookmark, isBookmarked, setLastVisited } = useStudy();
@@ -154,6 +155,11 @@ export const Lesson2Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
                   <div style={{ marginTop: '2rem' }}>
                     <VacuumWorldSimulator />
                   </div>
+                )}
+
+                {/* Interactive PEAS Task Specification Explorer */}
+                {sec.id === 'peas-specification' && (
+                  <PeasExplorer />
                 )}
 
                 {/* Romania Graph Visualizer in Search Strategies Chapter */}
