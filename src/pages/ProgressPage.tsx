@@ -1,4 +1,5 @@
 import React from 'react';
+import { Lightbulb } from 'lucide-react';
 import { useStudy } from '../context/StudyContext';
 import { LESSON_1_DATA } from '../data/lesson1Data';
 import { LESSON_2_DATA } from '../data/lesson2Data';
@@ -204,7 +205,7 @@ export const ProgressPage: React.FC<{
       <section style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            💡 Your learning progress and quiz answers are automatically saved to your browser’s local storage.
+            <Lightbulb size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.3rem", color: "#fbbf24" }} /> Your learning progress and quiz answers are automatically saved to your browser’s local storage.
           </div>
 
           <button

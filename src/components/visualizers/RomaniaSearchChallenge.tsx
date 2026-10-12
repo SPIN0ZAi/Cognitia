@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ROMANIA_GRAPH } from '../../data/romaniaData';
 import type { SearchAlgorithmType, SearchStepNode } from '../../types/graph';
-import { Shuffle, RotateCcw, CheckCircle2, XCircle, Lightbulb, Trophy, ArrowRight, Award } from 'lucide-react';
+import { Shuffle, RotateCcw, CheckCircle2, XCircle, Lightbulb, Trophy, ArrowRight, Award, Flame } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface ChallengeState {
@@ -317,7 +317,7 @@ export const RomaniaSearchChallenge: React.FC = () => {
             </span>
             {streak > 1 && (
               <span className="badge badge-amber font-mono" style={{ fontSize: '0.78rem' }}>
-                🔥 Streak: {streak}
+                <Flame size={14} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> Streak: {streak}
               </span>
             )}
           </div>

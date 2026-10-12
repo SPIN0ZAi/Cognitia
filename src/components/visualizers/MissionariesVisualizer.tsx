@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RotateCcw, Play, CheckCircle, AlertTriangle, Users } from 'lucide-react';
+import { RotateCcw, Play, CheckCircle, AlertTriangle, Users, Ship } from 'lucide-react';
 
 interface RiverState {
   mLeft: number;
@@ -146,8 +146,8 @@ export const MissionariesVisualizer: React.FC = () => {
               Left Bank
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', fontSize: '1.4rem' }}>
-              <div>{Array(state.mLeft).fill('🧔‍♂️').join('')}</div>
-              <div>{Array(state.cLeft).fill('👹').join('')}</div>
+              <div>{Array(state.mLeft).fill(null).map((_, i) => <span key={i} style={{ display: "inline-flex", width: "1.2em", height: "1.2em", borderRadius: "50%", background: "#38bdf8", color: "#0f172a", alignItems: "center", justifyContent: "center", fontSize: "0.7em", fontWeight: 800, marginRight: "2px" }}>M</span>)}</div>
+              <div>{Array(state.cLeft).fill(null).map((_, i) => <span key={i} style={{ display: "inline-flex", width: "1.2em", height: "1.2em", borderRadius: "50%", background: "#f43f5e", color: "#0f172a", alignItems: "center", justifyContent: "center", fontSize: "0.7em", fontWeight: 800, marginRight: "2px" }}>C</span>)}</div>
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
               Missionaries: <strong>{state.mLeft}</strong> | Cannibals: <strong>{state.cLeft}</strong>
@@ -180,7 +180,7 @@ export const MissionariesVisualizer: React.FC = () => {
                 transition: 'all 0.4s ease',
               }}
             >
-              🛶 Boat ({state.boatLeft ? 'Left' : 'Right'})
+              <Ship size={16} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.3rem" }} /> Boat ({state.boatLeft ? 'Left' : 'Right'})
             </div>
           </div>
 
@@ -199,8 +199,8 @@ export const MissionariesVisualizer: React.FC = () => {
               Right Bank (Goal)
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', fontSize: '1.4rem' }}>
-              <div>{Array(mRight).fill('🧔‍♂️').join('')}</div>
-              <div>{Array(cRight).fill('👹').join('')}</div>
+              <div>{Array(mRight).fill(null).map((_, i) => <span key={i} style={{ display: "inline-flex", width: "1.2em", height: "1.2em", borderRadius: "50%", background: "#38bdf8", color: "#0f172a", alignItems: "center", justifyContent: "center", fontSize: "0.7em", fontWeight: 800, marginRight: "2px" }}>M</span>)}</div>
+              <div>{Array(cRight).fill(null).map((_, i) => <span key={i} style={{ display: "inline-flex", width: "1.2em", height: "1.2em", borderRadius: "50%", background: "#f43f5e", color: "#0f172a", alignItems: "center", justifyContent: "center", fontSize: "0.7em", fontWeight: 800, marginRight: "2px" }}>C</span>)}</div>
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
               Missionaries: <strong>{mRight}</strong> | Cannibals: <strong>{cRight}</strong>

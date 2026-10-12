@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { EightPuzzleBoard } from '../../types/graph';
-import { RotateCcw, Shuffle, Grid3X3, CheckCircle2 } from 'lucide-react';
+import { RotateCcw, Shuffle, Grid3X3, CheckCircle2, Check } from 'lucide-react';
 import { TactileButton, CoordinateStamp, StatusLed } from '../common/InstrumentControls';
 import { useLabTheme } from '../../context/LabThemeContext';
 import confetti from 'canvas-confetti';
@@ -307,7 +307,13 @@ export const EightPuzzleVisualizer: React.FC = () => {
                               letterSpacing: '0.04em',
                             }}
                           >
-                            {isCorrect ? '✓ IN GOAL' : `d=${vec.dist}`}
+                            {isCorrect ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                <Check size={10} strokeWidth={3} /> IN GOAL
+                              </span>
+                            ) : (
+                              `d=${vec.dist}`
+                            )}
                           </div>
                         )}
                       </>
@@ -430,7 +436,7 @@ export const EightPuzzleVisualizer: React.FC = () => {
                 color: h2 >= h1 ? '#C6F277' : '#f87171',
               }}
             >
-              Dominance Theorem: h₂(n) &ge; h₁(n) &forall; n &implies; <strong>{h2} &ge; {h1}</strong> ({h2 >= h1 ? 'HOLDS ✓' : 'VIOLATION ✗'})
+              Dominance Theorem: h₂(n) &ge; h₁(n) &forall; n &implies; <strong>{h2} &ge; {h1}</strong> ({h2 >= h1 ? 'HOLDS' : 'VIOLATION'})
             </div>
 
             {/* Tile-by-Tile Vector Breakdown */}

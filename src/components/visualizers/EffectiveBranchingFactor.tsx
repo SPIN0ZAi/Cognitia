@@ -152,10 +152,10 @@ export const EffectiveBranchingFactor: React.FC = () => {
             </div>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
               {calculatedBStar < 1.3
-                ? '★ Outstanding heuristic quality (close to optimal 1.0)'
+                ? '\u2726 Outstanding heuristic quality (close to optimal 1.0)'
                 : calculatedBStar < 1.8
-                ? '✓ Good heuristic guidance'
-                : '⚠ High branching factor: significant exponential expansion'}
+                ? '\u2714 Good heuristic guidance'
+                : '\u25B2 High branching factor: significant exponential expansion'}
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History } from 'lucide-react';
+import { History, Zap, Snowflake, Landmark, Bot, Compass } from 'lucide-react';
 import { CoordinateStamp } from '../common/InstrumentControls';
 import { useLabTheme } from '../../context/LabThemeContext';
 
@@ -233,15 +233,15 @@ export const AITimeline: React.FC = () => {
   const getBadgeForType = (type: TimelineEvent['eventType']) => {
     switch (type) {
       case 'breakthrough':
-        return <span className="badge badge-lime font-mono">⚡ BREAKTHROUGH</span>;
+        return <span className="badge badge-lime font-mono"><Zap size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> BREAKTHROUGH</span>;
       case 'winter':
-        return <span className="badge badge-rose font-mono">❄️ AI WINTER</span>;
+        return <span className="badge badge-rose font-mono"><Snowflake size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> AI WINTER</span>;
       case 'foundation':
-        return <span className="badge badge-cyan font-mono">🏛️ FOUNDATION</span>;
+        return <span className="badge badge-cyan font-mono"><Landmark size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> FOUNDATION</span>;
       case 'system':
-        return <span className="badge badge-amber font-mono">🤖 APPLIED SYSTEM</span>;
+        return <span className="badge badge-amber font-mono"><Bot size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> APPLIED SYSTEM</span>;
       default:
-        return <span className="badge badge-indigo font-mono">📐 FORMAL THEORY</span>;
+        return <span className="badge badge-indigo font-mono"><Compass size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> FORMAL THEORY</span>;
     }
   };
 

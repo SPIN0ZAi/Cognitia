@@ -114,7 +114,7 @@ export const WaterJugsVisualizer: React.FC = () => {
               <div className="water-marks">
                 <div>4L</div>
                 <div>3L</div>
-                <div>2L ★</div>
+                <div style={{ color: '#fbbf24', fontWeight: 700 }}>2L [GOAL]</div>
                 <div>1L</div>
                 <div>0L</div>
               </div>
