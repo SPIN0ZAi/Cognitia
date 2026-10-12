@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { PRACTICE_QUESTIONS } from '../data/practiceData';
 import { QuizEngine } from '../components/practice/QuizEngine';
-import { Filter } from 'lucide-react';
+import { Filter, Compass, BookOpen } from 'lucide-react';
 import { useStudy } from '../context/StudyContext';
+import { RomaniaSearchChallenge } from '../components/visualizers/RomaniaSearchChallenge';
 
 export const PracticePage: React.FC<{
   onNavigate?: (view: string, lessonId?: string, sectionId?: string) => void;
@@ -10,6 +11,7 @@ export const PracticePage: React.FC<{
   const { progress } = useStudy();
   const [selectedLesson, setSelectedLesson] = useState<string>('all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
+  const [practiceTab, setPracticeTab] = useState<'quiz' | 'romania'>('quiz');
 
   const filteredQuestions = PRACTICE_QUESTIONS.filter((q: any) => {
     if (selectedLesson !== 'all' && q.lessonId !== selectedLesson) return false;
@@ -68,59 +70,93 @@ export const PracticePage: React.FC<{
           </div>
         </div>
 
-        {/* Filters Bar */}
+        {/* Practice Mode Tabs */}
         <div
           style={{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            padding: '1rem',
-            background: 'var(--bg-card)',
+            gap: '0.5rem',
+            padding: '0.4rem',
+            background: 'var(--bg-surface)',
             borderRadius: 'var(--radius-md)',
-            alignItems: 'center',
-            marginBottom: '1.75rem',
+            border: '1px solid var(--border-subtle)',
+            marginBottom: '1.5rem',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Filter size={15} className="text-cyan-400" />
-            <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Filter by Lesson:</span>
-          </div>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-            {[
-              { id: 'all', label: 'All Lessons' },
-              { id: 'lesson-1', label: 'Lesson 1 (Intro & Ethics)' },
-              { id: 'lesson-2', label: 'Lesson 2 (Uninformed Search)' },
-              { id: 'lesson-3', label: 'Lesson 3 (Heuristic Search)' },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setSelectedLesson(f.id)}
-                className={`btn-tactile btn-sm ${selectedLesson === f.id ? 'btn-primary' : ''}`}
-                style={{ fontSize: '0.75rem' }}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
-            {['all', 'Foundation', 'Intermediate', 'Exam-Level'].map((diff) => (
-              <button
-                key={diff}
-                onClick={() => setSelectedDifficulty(diff)}
-                className={`btn-tactile btn-sm ${selectedDifficulty === diff ? 'btn-amber' : ''}`}
-                style={{ fontSize: '0.72rem' }}
-              >
-                {diff === 'all' ? 'All Tiers' : diff}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setPracticeTab('quiz')}
+            className={`btn-tactile btn-sm ${practiceTab === 'quiz' ? 'btn-primary' : ''}`}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <BookOpen size={14} />
+            <span>Multiple Choice & Calculation Questions (15 Questions)</span>
+          </button>
+          <button
+            onClick={() => setPracticeTab('romania')}
+            className={`btn-tactile btn-sm ${practiceTab === 'romania' ? 'btn-amber' : ''}`}
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <Compass size={14} />
+            <span>Romania Route Search Interactive Exam Trainer</span>
+          </button>
         </div>
+
+        {/* Filters Bar (Only in Quiz Tab) */}
+        {practiceTab === 'quiz' && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              padding: '1rem',
+              background: 'var(--bg-card)',
+              borderRadius: 'var(--radius-md)',
+              alignItems: 'center',
+              marginBottom: '1.75rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Filter size={15} className="text-cyan-400" />
+              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Filter by Lesson:</span>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {[
+                { id: 'all', label: 'All Lessons' },
+                { id: 'lesson-1', label: 'Lesson 1 (Intro & Ethics)' },
+                { id: 'lesson-2', label: 'Lesson 2 (Uninformed Search)' },
+                { id: 'lesson-3', label: 'Lesson 3 (Heuristic Search)' },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setSelectedLesson(f.id)}
+                  className={`btn-tactile btn-sm ${selectedLesson === f.id ? 'btn-primary' : ''}`}
+                  style={{ fontSize: '0.75rem' }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.4rem' }}>
+              {['all', 'Foundation', 'Intermediate', 'Exam-Level'].map((diff) => (
+                <button
+                  key={diff}
+                  onClick={() => setSelectedDifficulty(diff)}
+                  className={`btn-tactile btn-sm ${selectedDifficulty === diff ? 'btn-amber' : ''}`}
+                  style={{ fontSize: '0.72rem' }}
+                >
+                  {diff === 'all' ? 'All Tiers' : diff}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Interactive Quiz Engine */}
-      {filteredQuestions.length > 0 ? (
+      {/* Main Content Area */}
+      {practiceTab === 'romania' ? (
+        <RomaniaSearchChallenge />
+      ) : filteredQuestions.length > 0 ? (
         <QuizEngine questions={filteredQuestions} />
       ) : (
         <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>

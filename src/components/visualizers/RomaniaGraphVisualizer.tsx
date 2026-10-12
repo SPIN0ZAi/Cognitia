@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { ROMANIA_GRAPH } from '../../data/romaniaData';
 import type { SearchAlgorithmType, SearchStepNode } from '../../types/graph';
-import { Play, Pause, RotateCcw, ChevronRight, Compass } from 'lucide-react';
+import { Play, Pause, RotateCcw, ChevronRight, Compass, Trophy } from 'lucide-react';
+import { RomaniaSearchChallenge } from './RomaniaSearchChallenge';
 
 export const RomaniaGraphVisualizer: React.FC = () => {
   const [selectedAlgo, setSelectedAlgo] = useState<SearchAlgorithmType>('astar');
@@ -9,6 +10,7 @@ export const RomaniaGraphVisualizer: React.FC = () => {
   const [goalCity, setGoalCity] = useState('Bucharest');
   const [isGraphMode, setIsGraphMode] = useState(true); // Graph Search (with explored set) vs Tree Search
   const [depthLimit, setDepthLimit] = useState(19);
+  const [viewMode, setViewMode] = useState<'simulator' | 'challenge'>('simulator');
 
   // Search execution state
   const [frontier, setFrontier] = useState<SearchStepNode[]>([]);
@@ -197,8 +199,54 @@ export const RomaniaGraphVisualizer: React.FC = () => {
     };
   }, [isPlaying, frontier, isFinished, speedMs]);
 
+  if (viewMode === 'challenge') {
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', padding: '0.35rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+          <button
+            onClick={() => setViewMode('simulator')}
+            className="btn-tactile btn-sm"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <Compass size={14} />
+            <span>Switch to Algorithm Exploration Simulator</span>
+          </button>
+          <button
+            onClick={() => setViewMode('challenge')}
+            className="btn-tactile btn-sm btn-amber"
+            style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+          >
+            <Trophy size={14} />
+            <span>Interactive Student Exam Challenge Mode</span>
+          </button>
+        </div>
+        <RomaniaSearchChallenge />
+      </div>
+    );
+  }
+
   return (
     <div className="visualizer-container">
+      {/* View Mode Switcher */}
+      <div style={{ display: 'flex', gap: '0.5rem', margin: '0.75rem 1rem 0 1rem', padding: '0.35rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+        <button
+          onClick={() => setViewMode('simulator')}
+          className="btn-tactile btn-sm btn-primary"
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
+          <Compass size={14} />
+          <span>Algorithm Exploration Simulator</span>
+        </button>
+        <button
+          onClick={() => setViewMode('challenge')}
+          className="btn-tactile btn-sm"
+          style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+        >
+          <Trophy size={14} />
+          <span>Switch to Student Exam Challenge Mode</span>
+        </button>
+      </div>
+
       <div className="visualizer-header">
         <div className="visualizer-title-area">
           <div className="visualizer-title">
