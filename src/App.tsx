@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { StudyProvider } from './context/StudyContext';
+import { LabThemeProvider } from './context/LabThemeContext';
+import { LivingFieldCanvas } from './components/common/LivingFieldCanvas';
+import { MagneticCursor } from './components/common/MagneticCursor';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { Footer } from './components/layout/Footer';
@@ -34,6 +37,12 @@ export function AppContent() {
 
   return (
     <div className="app-container">
+      {/* Persistent Algorithmic Living Canvas Layer */}
+      <LivingFieldCanvas />
+
+      {/* Precision Instrument Magnetic Cursor */}
+      <MagneticCursor />
+
       {/* Sidebar */}
       <Sidebar
         currentView={currentView}
@@ -51,7 +60,7 @@ export function AppContent() {
           onNavigate={handleNavigate}
         />
 
-        <main style={{ minHeight: '80vh' }}>
+        <main style={{ minHeight: '80vh', position: 'relative', zIndex: 2 }}>
           {currentView === 'home' && <CourseHomePage onNavigate={handleNavigate} />}
           {currentView === 'lesson' && currentLessonId === 'lesson-1' && (
             <Lesson1Page activeSectionId={currentSectionId} />
@@ -79,7 +88,10 @@ export function AppContent() {
 export default function App() {
   return (
     <StudyProvider>
-      <AppContent />
+      <LabThemeProvider>
+        <AppContent />
+      </LabThemeProvider>
     </StudyProvider>
   );
 }
+
