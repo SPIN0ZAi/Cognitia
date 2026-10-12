@@ -303,7 +303,7 @@ export class CanvasRenderer {
 
     // Death spin sequence
     if (engine.state === 'player_caught') {
-      const deathProgress = 1.0 - Math.max(0, p.invulnerableTimer);
+      const deathProgress = Math.min(1.0, Math.max(0, (1.5 - engine.deathTimer) / 1.5));
       const angleOpen = Math.min(Math.PI * 0.99, deathProgress * Math.PI);
       ctx.fillStyle = '#ffff00';
       ctx.beginPath();
@@ -343,6 +343,10 @@ export class CanvasRenderer {
   }
 
   private renderGhosts(ctx: CanvasRenderingContext2D, engine: GameEngine, tileSize: number): void {
+    if (engine.state === 'player_caught') {
+      return; // Authentic arcade Pac-Man: ghosts disappear during death spin
+    }
+
     const now = this.animFrameTime;
 
     for (const ghost of engine.ghosts) {

@@ -179,6 +179,11 @@ export class MazeMap {
       return false;
     }
 
+    // Protect off-board void areas (columns outside 5..22 on rows 10..12 and 16..18)
+    if ((rx < 5 || rx > 22) && ((ry >= 10 && ry <= 12) || (ry >= 16 && ry <= 18))) {
+      return false;
+    }
+
     const t = this.grid[ry][rx];
     if (t === 'wall') return false;
     if (t === 'door') return isGhost; // Only ghosts can pass through door
