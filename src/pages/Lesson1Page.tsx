@@ -4,6 +4,7 @@ import { useStudy } from '../context/StudyContext';
 import { Bookmark, CheckCircle2 } from 'lucide-react';
 import { NeuronSimulator } from '../components/visualizers/NeuronSimulator';
 import { AITimeline } from '../components/visualizers/AITimeline';
+import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 
 export const Lesson1Page: React.FC<{ activeSectionId?: string }> = ({ activeSectionId }) => {
   const { progress, markSectionComplete, toggleBookmark, isBookmarked, setLastVisited } = useStudy();
@@ -140,16 +141,7 @@ export const Lesson1Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    fontSize: '0.88rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.7,
-                    whiteSpace: 'pre-line',
-                  }}
-                >
-                  {sec.content}
-                </div>
+                <MarkdownRenderer content={sec.content} />
 
                 {/* If Early Foundations section, embed McCulloch-Pitts Neuron Simulator */}
                 {sec.id === 'early-foundations' && (
