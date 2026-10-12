@@ -1,14 +1,18 @@
 /**
  * Cognitia Chase: Maze Agents — Core Engine Types
+ * 
+ * Supports both Authentic 1980 Arcade Pac-Man Dossier rules (Blinky, Pinky, Inky, Clyde)
+ * and Course Algorithm Search Mode (The Wave, The Miser, The Plunger, The Gambler, The Strategist).
  */
 
 export type TileType =
-  | 'wall'       // Impassable circuit barrier
-  | 'empty'      // Walkable open path (cleared)
-  | 'pellet'     // Standard knowledge node (cost 1 to traverse, +10 pts)
-  | 'power'      // Super Inversion node (cost 1 to traverse, +50 pts, frightens ghosts)
-  | 'mud'        // High-friction obstacle (cost 3 to traverse, slows down)
-  | 'ice';       // Low-friction superconductor (cost 0.5 to traverse, fast)
+  | 'wall'       // Impassable outer or interior maze wall
+  | 'empty'      // Walkable cleared path
+  | 'pellet'     // Standard dot (+10 pts, 1 frame pause)
+  | 'power'      // Energizer / Power pellet (+50 pts, 3 frames pause, frightens ghosts)
+  | 'door'       // Ghost house permeable door (permeable to ghosts, blocked to player)
+  | 'mud'        // High-friction obstacle (cost 3 to traverse, used in algorithm mode)
+  | 'ice';       // Low-friction superconductor (cost 0.5 to traverse, used in algorithm mode)
 
 export type Direction = 'up' | 'down' | 'left' | 'right' | 'none';
 
@@ -17,21 +21,11 @@ export interface GridCoord {
   y: number;
 }
 
-export interface EntityPosition {
-  tileX: number;
-  tileY: number;
-  subX: number; // 0.0 to 1.0 within tile for smooth interpolation
-  subY: number;
-}
+export type ClassicGhostId = 'blinky' | 'pinky' | 'inky' | 'clyde';
+export type AlgoGhostId = 'bfs' | 'ucs' | 'dfs' | 'greedy' | 'astar';
+export type GhostPersonality = ClassicGhostId | AlgoGhostId;
 
-export type GhostPersonality =
-  | 'bfs'     // The Wave: expands layer by layer, fewest hops
-  | 'ucs'     // The Miser: cost-sensitive, avoids mud, favors ice
-  | 'dfs'     // The Plunger: dives deep down corridors, easily tricked
-  | 'greedy'  // The Gambler: h(n) pure seeker, gets trapped in dead-ends
-  | 'astar';  // The Strategist: optimal g + h balancer
-
-export type GhostMode = 'chase' | 'scatter' | 'frightened' | 'eaten';
+export type GhostMode = 'chase' | 'scatter' | 'frightened' | 'eaten' | 'house';
 
 export interface GhostTelemetry {
   algorithm: GhostPersonality;
@@ -58,41 +52,57 @@ export interface GhostEntity {
   name: string;
   codename: string;
   color: string;
-  x: number; // floating tile coordinate
+  x: number; // floating tile coordinate (sub-tile precision)
   y: number;
   targetTile: GridCoord;
+  scatterTile: GridCoord;
   dir: Direction;
   nextDir: Direction;
   speed: number; // tiles per second
   mode: GhostMode;
   frightenedTimer: number;
+  inHouse: boolean;
+  dotCounter: number;
+  cruiseElroy: number; // 0 = off, 1 = elroy 1, 2 = elroy 2
   path: GridCoord[];
   telemetry: GhostTelemetry;
 }
 
 export interface PlayerEntity {
-  x: number; // floating tile coordinate
+  x: number; // floating tile coordinate (sub-tile precision)
   y: number;
   dir: Direction;
-  nextDir: Direction;
+  nextDir: Direction; // buffered pre-turn direction for corner-cutting
   speed: number;
   lives: number;
   invulnerableTimer: number;
+  eatPauseFrames: number; // 1 frame per dot, 3 frames per energizer
+}
+
+export interface BonusFruitEntity {
+  active: boolean;
+  tile: GridCoord;
+  type: 'cherry' | 'strawberry' | 'peach' | 'apple' | 'melon' | 'galaxian' | 'bell' | 'key';
+  points: number;
+  timer: number; // remaining display time in seconds
+  collected: boolean;
 }
 
 export type GameEngineState =
-  | 'ready'
-  | 'running'
-  | 'paused'
-  | 'player_caught'
-  | 'level_cleared'
-  | 'game_over';
+  | 'ready'          // READY! intro sequence
+  | 'running'        // Active gameplay
+  | 'paused'         // Game paused
+  | 'player_caught'  // Death animation sequence
+  | 'level_cleared'  // Level flashed & completed
+  | 'game_over';     // Game over
 
 export type GameMode =
-  | 'campaign'    // Micro-lessons + gating quizzes per algorithm
-  | 'ghost_lab'   // Algorithm sandbox + heuristic experiments
-  | 'be_the_agent'// Student solves path; compared against A* / BFS
-  | 'arcade';     // Endless survival score-chase
+  | 'campaign'       // Micro-lessons + gating quizzes per algorithm
+  | 'ghost_lab'      // Algorithm sandbox + heuristic experiments
+  | 'be_the_agent'   // Student solves path; compared against A* / BFS
+  | 'arcade';        // Classic endless arcade chase
+
+export type TargetingMode = 'classic' | 'algorithm';
 
 export interface CampaignLevelConfig {
   levelNumber: number;

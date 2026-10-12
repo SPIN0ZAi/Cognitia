@@ -15,13 +15,14 @@ import { GameEngine } from '../engine/GameEngine';
 import { CanvasRenderer } from '../renderer/CanvasRenderer';
 import { SoundSynthesizer } from '../audio/SoundSynthesizer';
 import { CAMPAIGN_LEVELS } from '../engine/campaignLevels';
-import { DEFAULT_MAZE_LAYOUTS } from '../engine/MazeMap';
-import type { GameMode, GhostPersonality, Direction } from '../engine/types';
+import { CLASSIC_ARCADE_MAZE } from '../engine/MazeMap';
+import type { GameMode, GhostPersonality, Direction, TargetingMode } from '../engine/types';
 import { XRayHud } from './XRayHud';
 import { MicroLessonModal } from './MicroLessonModal';
 import { GhostLabPanel } from './GhostLabPanel';
 import { BeTheAgentPanel } from './BeTheAgentPanel';
 import { TouchControls } from './TouchControls';
+import { HeuristicInsightModal } from './HeuristicInsightModal';
 import { runSearch } from '../../lib/search/GraphSearch';
 import {
   recordGameScore,
@@ -37,6 +38,7 @@ import {
   Pause,
   RotateCcw,
   HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -49,7 +51,9 @@ export const CognitiaChaseGame: React.FC = () => {
   const audioRef = useRef<SoundSynthesizer>(new SoundSynthesizer(true));
 
   // Game UI state
-  const [mode, setMode] = useState<GameMode>('campaign');
+  const [mode, setMode] = useState<GameMode>('arcade');
+  const [targetingMode, setTargetingMode] = useState<TargetingMode>('classic');
+  const [isInsightOpen, setIsInsightOpen] = useState(false);
   const [campaignLevelIndex, setCampaignLevelIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(0);
@@ -58,7 +62,7 @@ export const CognitiaChaseGame: React.FC = () => {
 
   // Controls & Options
   const [showXRay, setShowXRay] = useState(true);
-  const [focalPersonality, setFocalPersonality] = useState<GhostPersonality>('astar');
+  const [focalPersonality, setFocalPersonality] = useState<GhostPersonality>('blinky');
   const [heuristicType, setHeuristicType] = useState<'manhattan' | 'euclidean' | 'inadmissible'>('manhattan');
   const [isMuted, setIsMuted] = useState(true);
   const [gameSpeed, setGameSpeed] = useState<number>(1.0);
@@ -78,25 +82,32 @@ export const CognitiaChaseGame: React.FC = () => {
 
   // Initialize engine on mode or level change
   const initEngine = useCallback(() => {
-    let layout = DEFAULT_MAZE_LAYOUTS.level1_wave;
-    let ghosts: GhostPersonality[] = ['bfs'];
+    let layout = CLASSIC_ARCADE_MAZE;
+    let ghosts: GhostPersonality[] =
+      targetingMode === 'classic'
+        ? ['blinky', 'pinky', 'inky', 'clyde']
+        : ['astar', 'bfs', 'ucs', 'greedy', 'dfs'];
 
     if (mode === 'campaign') {
       const lvl = CAMPAIGN_LEVELS[campaignLevelIndex] || CAMPAIGN_LEVELS[0];
       layout = lvl.mazeLayout;
       ghosts = lvl.enemies;
     } else if (mode === 'ghost_lab') {
-      layout = DEFAULT_MAZE_LAYOUTS.level5_strategist;
+      layout = CLASSIC_ARCADE_MAZE;
       ghosts = ['astar', 'greedy'];
     } else if (mode === 'be_the_agent') {
-      layout = DEFAULT_MAZE_LAYOUTS.level2_miser;
+      layout = CLASSIC_ARCADE_MAZE;
       ghosts = []; // No ghosts chasing in Be The Agent mode
     } else if (mode === 'arcade') {
-      layout = DEFAULT_MAZE_LAYOUTS.arcade_arena;
-      ghosts = ['astar', 'bfs', 'ucs', 'greedy', 'dfs'];
+      layout = CLASSIC_ARCADE_MAZE;
+      ghosts =
+        targetingMode === 'classic'
+          ? ['blinky', 'pinky', 'inky', 'clyde']
+          : ['astar', 'bfs', 'ucs', 'greedy', 'dfs'];
     }
 
     const engine = new GameEngine(layout, mode, ghosts);
+    engine.setTargetingMode(targetingMode);
     engine.speedMultiplier = gameSpeed;
 
     // Load persisted high score
@@ -161,7 +172,7 @@ export const CognitiaChaseGame: React.FC = () => {
       const resBfs = runSearch(probBfs, 'bfs', { isGraphMode: true });
       setBenchBfs({ cost: resBfs.totalCost, steps: resBfs.path.length });
     }
-  }, [mode, campaignLevelIndex, gameSpeed]);
+  }, [mode, campaignLevelIndex, gameSpeed, targetingMode]);
 
   useEffect(() => {
     initEngine();
@@ -380,6 +391,92 @@ export const CognitiaChaseGame: React.FC = () => {
         </div>
       </div>
 
+      {/* Targeting Strategy & Academic Bridge Bar */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          padding: '0.65rem 1rem',
+          background: '#070c14',
+          border: '1px solid #162436',
+          borderRadius: '10px',
+          marginBottom: '1rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.74rem', fontFamily: 'var(--font-mono)', color: '#64748B' }}>
+            AI ENGINE:
+          </span>
+          <button
+            onClick={() => {
+              setTargetingMode('classic');
+              if (engineRef.current) engineRef.current.setTargetingMode('classic');
+            }}
+            style={{
+              padding: '0.35rem 0.85rem',
+              borderRadius: '6px',
+              background: targetingMode === 'classic' ? 'rgba(255, 159, 28, 0.2)' : '#0b121e',
+              border: `1.5px solid ${targetingMode === 'classic' ? '#FF9F1C' : '#1e2d42'}`,
+              color: targetingMode === 'classic' ? '#FF9F1C' : '#94A3B8',
+              fontSize: '0.76rem',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: targetingMode === 'classic' ? 700 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <span>👾</span> CLASSIC 1980 ARCADE (AUTHENTIC)
+          </button>
+          <button
+            onClick={() => {
+              setTargetingMode('algorithm');
+              if (engineRef.current) engineRef.current.setTargetingMode('algorithm');
+            }}
+            style={{
+              padding: '0.35rem 0.85rem',
+              borderRadius: '6px',
+              background: targetingMode === 'algorithm' ? 'rgba(120, 213, 232, 0.2)' : '#0b121e',
+              border: `1.5px solid ${targetingMode === 'algorithm' ? '#78D5E8' : '#1e2d42'}`,
+              color: targetingMode === 'algorithm' ? '#78D5E8' : '#94A3B8',
+              fontSize: '0.76rem',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: targetingMode === 'algorithm' ? 700 : 500,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            <span>🧠</span> ALGORITHM MODE (X-RAY A*)
+          </button>
+        </div>
+
+        <button
+          onClick={() => setIsInsightOpen(true)}
+          style={{
+            padding: '0.35rem 0.85rem',
+            borderRadius: '6px',
+            background: 'rgba(198, 242, 119, 0.12)',
+            border: '1px solid rgba(198, 242, 119, 0.35)',
+            color: '#C6F277',
+            fontSize: '0.76rem',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+          }}
+        >
+          <Sparkles size={14} /> Why Does It Work? (Heuristic Proof)
+        </button>
+      </div>
+
       {/* Campaign Level Bar (if in Campaign Mode) */}
       {mode === 'campaign' && (
         <div
@@ -526,7 +623,7 @@ export const CognitiaChaseGame: React.FC = () => {
               height: 'auto',
               minHeight: '380px',
               display: 'block',
-              aspectRatio: '19/13',
+              aspectRatio: '28/36',
             }}
           />
 
@@ -678,6 +775,12 @@ export const CognitiaChaseGame: React.FC = () => {
           unlockGameAchievement(`LEVEL_${campaignLevelIndex + 1}_STAR`);
         }}
         onClose={() => setIsLessonOpen(false)}
+      />
+
+      {/* Heuristic Insight Academic Modal */}
+      <HeuristicInsightModal
+        isOpen={isInsightOpen}
+        onClose={() => setIsInsightOpen(false)}
       />
     </div>
   );
