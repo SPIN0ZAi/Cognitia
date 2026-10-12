@@ -1,14 +1,108 @@
 import { useState, useEffect, useRef } from 'react';
 import { ROMANIA_GRAPH } from '../../data/romaniaData';
 import type { SearchAlgorithmType, SearchStepNode } from '../../types/graph';
-import { Play, Pause, RotateCcw, ChevronRight, Compass, Trophy } from 'lucide-react';
+import { Compass, Trophy } from 'lucide-react';
 import { RomaniaSearchChallenge } from './RomaniaSearchChallenge';
+import {
+  TransportDeck,
+  CoordinateStamp,
+  PseudocodeViewer,
+  StatusLed,
+} from '../common/InstrumentControls';
+
+interface SearchSnapshot {
+  frontier: SearchStepNode[];
+  explored: string[];
+  currentNode: SearchStepNode | null;
+  solutionPath: string[] | null;
+  totalCost: number;
+  stepCount: number;
+  isFinished: boolean;
+  statusMessage: string;
+  activeLineIndex: number;
+}
+
+const PSEUDOCODE_LINES: Record<SearchAlgorithmType, string[]> = {
+  astar: [
+    'frontier.insert(make_node(initial_state, f=g+h))',
+    'while (!frontier.isEmpty()) {',
+    '  node = frontier.pop_lowest_f()',
+    '  if (is_goal(node.state)) return solution(node)',
+    '  explored.add(node.state)',
+    '  for each child in expand(node) {',
+    '    if (child.state not in explored) {',
+    '      frontier.insert_or_update(child, f=g+h)',
+    '    }',
+    '  }',
+    '}',
+  ],
+  greedy: [
+    'frontier.insert(make_node(initial_state, f=h))',
+    'while (!frontier.isEmpty()) {',
+    '  node = frontier.pop_lowest_heuristic_h()',
+    '  if (is_goal(node.state)) return solution(node)',
+    '  explored.add(node.state)',
+    '  for each child in expand(node) {',
+    '    if (child.state not in explored) frontier.insert(child, f=h)',
+    '  }',
+    '}',
+  ],
+  ucs: [
+    'frontier.insert(make_node(initial_state, g=0))',
+    'while (!frontier.isEmpty()) {',
+    '  node = frontier.pop_lowest_path_cost_g()',
+    '  if (is_goal(node.state)) return solution(node)',
+    '  explored.add(node.state)',
+    '  for each child in expand(node) {',
+    '    if (child.state not in explored) frontier.insert(child, g)',
+    '  }',
+    '}',
+  ],
+  bfs: [
+    'frontier.enqueue(make_node(initial_state))',
+    'while (!frontier.isEmpty()) {',
+    '  node = frontier.dequeue_fifo()',
+    '  if (is_goal(node.state)) return solution(node)',
+    '  explored.add(node.state)',
+    '  for each child in expand(node) {',
+    '    if (child.state not in explored) frontier.enqueue(child)',
+    '  }',
+    '}',
+  ],
+  dfs: [
+    'frontier.push(make_node(initial_state))',
+    'while (!frontier.isEmpty()) {',
+    '  node = frontier.pop_lifo()',
+    '  if (is_goal(node.state)) return solution(node)',
+    '  explored.add(node.state)',
+    '  for each child in expand(node) {',
+    '    if (child.state not in explored) frontier.push(child)',
+    '  }',
+    '}',
+  ],
+  dls: [
+    'frontier.push(make_node(initial_state, depth=0))',
+    'while (!frontier.isEmpty()) {',
+    '  node = frontier.pop_lifo()',
+    '  if (is_goal(node.state)) return solution(node)',
+    '  if (node.depth < limit) {',
+    '    for each child in expand(node) frontier.push(child)',
+    '  }',
+    '}',
+  ],
+  ids: [
+    'for depth_limit = 0 to infinity {',
+    '  result = DLS(initial_state, depth_limit)',
+    '  if (result != cutoff) return result',
+    '}',
+  ],
+};
 
 export const RomaniaGraphVisualizer: React.FC = () => {
   const [selectedAlgo, setSelectedAlgo] = useState<SearchAlgorithmType>('astar');
   const [startCity, setStartCity] = useState('Arad');
   const [goalCity, setGoalCity] = useState('Bucharest');
-  const [isGraphMode, setIsGraphMode] = useState(true); // Graph Search (with explored set) vs Tree Search
+  const [isGraphMode, setIsGraphMode] = useState(true);
   const [depthLimit, setDepthLimit] = useState(19);
   const [viewMode, setViewMode] = useState<'simulator' | 'challenge'>('simulator');
 
@@ -20,11 +114,15 @@ export const RomaniaGraphVisualizer: React.FC = () => {
   const [totalCost, setTotalCost] = useState(0);
   const [stepCount, setStepCount] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('Click Play or Step to begin search.');
+  const [statusMessage, setStatusMessage] = useState('Initialized search laboratory radar.');
+  const [activeLineIndex, setActiveLineIndex] = useState(0);
+
+  // History stack for stepping backwards
+  const [history, setHistory] = useState<SearchSnapshot[]>([]);
 
   // Animation playback
   const [isPlaying, setIsPlaying] = useState(false);
-  const [speedMs, setSpeedMs] = useState(800);
+  const [speedMs, setSpeedMs] = useState(750);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Initialize or reset search
@@ -50,7 +148,9 @@ export const RomaniaGraphVisualizer: React.FC = () => {
     setTotalCost(0);
     setStepCount(0);
     setIsFinished(false);
-    setStatusMessage(`Initialized search from ${startCity} using ${selectedAlgo.toUpperCase()}.`);
+    setStatusMessage(`Initialized search radar from ${startCity} to ${goalCity} using ${selectedAlgo.toUpperCase()}.`);
+    setActiveLineIndex(0);
+    setHistory([]);
   };
 
   useEffect(() => {
@@ -62,47 +162,57 @@ export const RomaniaGraphVisualizer: React.FC = () => {
     if (isFinished || frontier.length === 0) {
       if (frontier.length === 0 && !isFinished) {
         setIsFinished(true);
-        setStatusMessage('Frontier exhausted: No solution found.');
+        setStatusMessage('Search frontier exhausted: Target node unreachable.');
       }
       setIsPlaying(false);
       return;
     }
 
-    // Sort or extract based on algorithm
+    // Save snapshot to history
+    setHistory((prev) => [
+      ...prev,
+      {
+        frontier: [...frontier],
+        explored: [...explored],
+        currentNode,
+        solutionPath,
+        totalCost,
+        stepCount,
+        isFinished,
+        statusMessage,
+        activeLineIndex,
+      },
+    ]);
+
+    // Priority ordering
     let nextFrontier = [...frontier];
     let selected: SearchStepNode;
 
     if (selectedAlgo === 'bfs') {
-      // FIFO: extract first
       selected = nextFrontier.shift()!;
     } else if (selectedAlgo === 'dfs') {
-      // LIFO: extract last
       selected = nextFrontier.pop()!;
     } else if (selectedAlgo === 'ucs') {
-      // Priority by g(n) ascending
       nextFrontier.sort((a, b) => a.g - b.g);
       selected = nextFrontier.shift()!;
     } else if (selectedAlgo === 'greedy') {
-      // Priority by h(n) ascending
       nextFrontier.sort((a, b) => a.h - b.h);
       selected = nextFrontier.shift()!;
     } else if (selectedAlgo === 'astar') {
-      // Priority by f(n) = g(n) + h(n) ascending
       nextFrontier.sort((a, b) => a.f - b.f || a.h - b.h);
       selected = nextFrontier.shift()!;
     } else if (selectedAlgo === 'dls') {
-      // LIFO with depth cutoff
       selected = nextFrontier.pop()!;
     } else {
-      // IDS default step
       nextFrontier.sort((a, b) => a.f - b.f);
       selected = nextFrontier.shift()!;
     }
 
-    // Check if in explored set (for graph search)
+    // Explored set skip
     if (isGraphMode && explored.includes(selected.state)) {
       setFrontier(nextFrontier);
-      setStatusMessage(`Skipping ${selected.state} (already in explored set).`);
+      setStatusMessage(`Cycle detected: ${selected.state} already in explored set.`);
+      setActiveLineIndex(4);
       return;
     }
 
@@ -110,35 +220,29 @@ export const RomaniaGraphVisualizer: React.FC = () => {
     const newExplored = isGraphMode ? [...explored, selected.state] : explored;
     setExplored(newExplored);
     setStepCount((prev) => prev + 1);
+    setActiveLineIndex(2);
 
-    // Goal test on extraction
+    // Goal test
     if (selected.state === goalCity) {
       setIsFinished(true);
       setIsPlaying(false);
       setTotalCost(selected.g);
+      setActiveLineIndex(3);
 
-      // Reconstruct path
-      const path: string[] = [selected.state];
-      let curr = selected;
-      while (curr.parentId) {
-        // Find parent in explored/history
-        const parentName = curr.parentId.split('-')[0];
-        path.unshift(parentName);
-        break; // For visual illustration
-      }
       setSolutionPath([startCity, ...((selected.state !== startCity) ? [selected.state] : [])]);
-      setStatusMessage(`Goal reached! Found optimal route to ${goalCity} with cost ${selected.g} km.`);
+      setStatusMessage(`Goal reached! Optimal path to ${goalCity} found with cost ${selected.g} km.`);
       return;
     }
 
     // Depth check for DLS
     if (selectedAlgo === 'dls' && selected.depth >= depthLimit) {
       setFrontier(nextFrontier);
-      setStatusMessage(`Depth limit ${depthLimit} reached at ${selected.state}. Cutting off branch.`);
+      setStatusMessage(`Depth cutoff: limit ${depthLimit} reached at ${selected.state}.`);
+      setActiveLineIndex(4);
       return;
     }
 
-    // Expand successors
+    // Successor expansion
     const cityData = ROMANIA_GRAPH[selected.state];
     if (cityData) {
       const generatedChildren: SearchStepNode[] = [];
@@ -170,24 +274,37 @@ export const RomaniaGraphVisualizer: React.FC = () => {
         generatedChildren.push(childNode);
       });
 
-      if (selectedAlgo === 'dfs' || selectedAlgo === 'dls') {
-        // Push children for LIFO
-        nextFrontier = [...nextFrontier, ...generatedChildren];
-      } else {
-        // Append or priority insert
-        nextFrontier = [...nextFrontier, ...generatedChildren];
-      }
-
+      nextFrontier = [...nextFrontier, ...generatedChildren];
       setFrontier(nextFrontier);
-      setStatusMessage(
-        `Expanded ${selected.state} (g=${selected.g}, h=${selected.h}, f=${selected.f}). Generated ${generatedChildren.length} successors.`
-      );
+      setStatusMessage(`Extracted ${selected.state} (g=${selected.g}, h=${selected.h}, f=${selected.f}). Generated ${generatedChildren.length} child nodes.`);
+      setActiveLineIndex(6);
     }
+  };
+
+  // Step backwards using history snapshot
+  const stepBackward = () => {
+    if (history.length === 0) return;
+    const lastSnap = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, prev.length - 1));
+
+    setFrontier(lastSnap.frontier);
+    setExplored(lastSnap.explored);
+    setCurrentNode(lastSnap.currentNode);
+    setSolutionPath(lastSnap.solutionPath);
+    setTotalCost(lastSnap.totalCost);
+    setStepCount(lastSnap.stepCount);
+    setIsFinished(lastSnap.isFinished);
+    setStatusMessage(lastSnap.statusMessage);
+    setActiveLineIndex(lastSnap.activeLineIndex);
   };
 
   // Autoplay loop
   useEffect(() => {
     if (isPlaying) {
+      if (isFinished || frontier.length === 0) {
+        setIsPlaying(false);
+        return;
+      }
       timerRef.current = setInterval(() => {
         stepSearch();
       }, speedMs);
@@ -202,7 +319,7 @@ export const RomaniaGraphVisualizer: React.FC = () => {
   if (viewMode === 'challenge') {
     return (
       <div>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', padding: '0.35rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', padding: '0.35rem', background: 'var(--lab-bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--lab-border-subtle)' }}>
           <button
             onClick={() => setViewMode('simulator')}
             className="btn-tactile btn-sm"
@@ -226,9 +343,16 @@ export const RomaniaGraphVisualizer: React.FC = () => {
   }
 
   return (
-    <div className="visualizer-container">
+    <div className="visualizer-container" style={{ background: 'var(--lab-bg-surface)', border: '1px solid var(--lab-border-subtle)' }}>
+      {/* Top Technical Coordinate Stamp */}
+      <CoordinateStamp
+        sectionCode="RADAR:02 // ROMANIA_TOPOLOGY"
+        statusText={`ALGO_${selectedAlgo.toUpperCase()}_ENGAGED`}
+        coords="45.9432°N 24.9668°E"
+      />
+
       {/* View Mode Switcher */}
-      <div style={{ display: 'flex', gap: '0.5rem', margin: '0.75rem 1rem 0 1rem', padding: '0.35rem', background: 'var(--bg-surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', margin: '0 0 1rem 0', padding: '0.35rem', background: '#070a10', borderRadius: 'var(--radius-md)', border: '1px solid var(--lab-border-subtle)' }}>
         <button
           onClick={() => setViewMode('simulator')}
           className="btn-tactile btn-sm btn-primary"
@@ -247,143 +371,121 @@ export const RomaniaGraphVisualizer: React.FC = () => {
         </button>
       </div>
 
-      <div className="visualizer-header">
+      {/* Visualizer Header */}
+      <div className="visualizer-header" style={{ marginBottom: '1rem' }}>
         <div className="visualizer-title-area">
-          <div className="visualizer-title">
+          <div className="visualizer-title" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: '#F1F5F9' }}>
             <Compass size={19} className="text-cyan-400" />
-            Romania Route Search Simulator
+            Romania Topographic Route Search Radar
           </div>
-          <div className="visualizer-subtitle">
-            Interactive State Space Graph & Priority Queue Exploration Engine (UCLM 2026/2027)
+          <div className="visualizer-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem' }}>
+            Discrete State Space Graph, Priority Queue Dynamics &amp; Admissible Heuristic Evaluation
           </div>
         </div>
 
-        <div className="visualizer-controls">
-          <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            disabled={isFinished}
-            className={`btn-tactile ${isPlaying ? 'btn-amber' : 'btn-primary'}`}
-          >
-            {isPlaying ? <Pause size={15} /> : <Play size={15} />}
-            {isPlaying ? 'Pause' : 'Play'}
-          </button>
-
-          <button
-            onClick={stepSearch}
-            disabled={isPlaying || isFinished}
-            className="btn-tactile"
-          >
-            <ChevronRight size={15} />
-            Step
-          </button>
-
-          <button onClick={resetSearch} className="btn-tactile">
-            <RotateCcw size={15} />
-            Reset
-          </button>
-        </div>
+        <StatusLed status={isPlaying ? 'active' : isFinished ? 'warning' : 'idle'} label={isPlaying ? 'Running' : isFinished ? 'Goal Reached' : 'Idle'} />
       </div>
 
       <div className="visualizer-body">
-        {/* Settings Bar */}
+        {/* Settings Deck */}
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
             gap: '1rem',
-            marginBottom: '1.25rem',
-            padding: '0.85rem 1rem',
-            background: 'var(--bg-card)',
+            marginBottom: '1rem',
+            padding: '0.75rem 1rem',
+            background: 'linear-gradient(180deg, #0e1422 0%, #090e18 100%)',
             borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--lab-border-subtle)',
             alignItems: 'center',
-            fontSize: '0.85rem',
+            fontSize: '0.82rem',
           }}
         >
           <div>
-            <label style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>Algorithm:</label>
+            <label style={{ marginRight: '0.4rem', color: 'var(--lab-text-muted)', fontFamily: 'var(--font-mono)' }}>ALGO:</label>
             <select
               value={selectedAlgo}
               onChange={(e) => setSelectedAlgo(e.target.value as SearchAlgorithmType)}
               style={{
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: '6px',
-                padding: '0.3rem 0.6rem',
+                background: '#070a10',
+                color: 'var(--lab-accent-cyan)',
+                border: '1px solid #1a2536',
+                borderRadius: '4px',
+                padding: '0.25rem 0.5rem',
                 fontFamily: 'var(--font-mono)',
+                fontSize: '0.78rem',
               }}
             >
               <optgroup label="Uninformed Search (Lesson 2)">
-                <option value="bfs">BFS (Breadth-First Search)</option>
-                <option value="ucs">UCS (Uniform-Cost Search)</option>
-                <option value="dfs">DFS (Depth-First Search)</option>
-                <option value="dls">DLS (Depth-Limited Search)</option>
+                <option value="bfs">BFS (FIFO Queue)</option>
+                <option value="ucs">UCS (Min g(n))</option>
+                <option value="dfs">DFS (LIFO Stack)</option>
+                <option value="dls">DLS (Depth Cutoff)</option>
               </optgroup>
-              <optgroup label="Informed / Heuristic Search (Lesson 3)">
-                <option value="greedy">Greedy Best-First (f = h)</option>
-                <option value="astar">A* Search (f = g + h)</option>
+              <optgroup label="Informed Heuristic Search (Lesson 3)">
+                <option value="greedy">Greedy Best-First (Min h(n))</option>
+                <option value="astar">A* Search (Min f(n) = g + h)</option>
               </optgroup>
             </select>
           </div>
 
           <div>
-            <label style={{ marginRight: '0.4rem', color: 'var(--text-muted)' }}>Start:</label>
+            <label style={{ marginRight: '0.4rem', color: 'var(--lab-text-muted)', fontFamily: 'var(--font-mono)' }}>START:</label>
             <select
               value={startCity}
               onChange={(e) => setStartCity(e.target.value)}
               style={{
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: '6px',
-                padding: '0.3rem 0.5rem',
+                background: '#070a10',
+                color: '#F1F5F9',
+                border: '1px solid #1a2536',
+                borderRadius: '4px',
+                padding: '0.25rem 0.5rem',
                 fontFamily: 'var(--font-mono)',
+                fontSize: '0.78rem',
               }}
             >
               {Object.keys(ROMANIA_GRAPH).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label style={{ marginRight: '0.4rem', color: 'var(--text-muted)' }}>Goal:</label>
+            <label style={{ marginRight: '0.4rem', color: 'var(--lab-text-muted)', fontFamily: 'var(--font-mono)' }}>GOAL:</label>
             <select
               value={goalCity}
               onChange={(e) => setGoalCity(e.target.value)}
               style={{
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: '6px',
-                padding: '0.3rem 0.5rem',
+                background: '#070a10',
+                color: '#F1F5F9',
+                border: '1px solid #1a2536',
+                borderRadius: '4px',
+                padding: '0.25rem 0.5rem',
                 fontFamily: 'var(--font-mono)',
+                fontSize: '0.78rem',
               }}
             >
               {Object.keys(ROMANIA_GRAPH).map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>Graph Mode:</label>
+            <label style={{ marginRight: '0.4rem', color: 'var(--lab-text-muted)', fontFamily: 'var(--font-mono)' }}>MODE:</label>
             <button
               onClick={() => setIsGraphMode(!isGraphMode)}
-              className={`badge ${isGraphMode ? 'badge-emerald' : 'badge-amber'}`}
+              className={`badge ${isGraphMode ? 'badge-lime' : 'badge-amber'}`}
               style={{ cursor: 'pointer', border: 'none' }}
             >
-              {isGraphMode ? 'Graph Search (Closed List ON)' : 'Tree Search (Loops Possible)'}
+              {isGraphMode ? 'Graph Search (Closed List)' : 'Tree Search (Loops)'}
             </button>
           </div>
 
           {selectedAlgo === 'dls' && (
             <div>
-              <label style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>Limit (l):</label>
+              <label style={{ marginRight: '0.4rem', color: 'var(--lab-text-muted)', fontFamily: 'var(--font-mono)' }}>LIMIT (l):</label>
               <input
                 type="number"
                 min="1"
@@ -391,42 +493,67 @@ export const RomaniaGraphVisualizer: React.FC = () => {
                 value={depthLimit}
                 onChange={(e) => setDepthLimit(Number(e.target.value))}
                 style={{
-                  width: '50px',
-                  background: 'var(--bg-surface)',
-                  color: '#fff',
-                  border: '1px solid var(--border-subtle)',
+                  width: '45px',
+                  background: '#070a10',
+                  color: '#F1F5F9',
+                  border: '1px solid #1a2536',
                   borderRadius: '4px',
-                  padding: '0.2rem',
+                  padding: '0.2rem 0.35rem',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.78rem',
                 }}
               />
             </div>
           )}
-
-          <div>
-            <label style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>Speed:</label>
-            <input
-              type="range"
-              min="200"
-              max="2000"
-              step="100"
-              value={speedMs}
-              onChange={(e) => setSpeedMs(Number(e.target.value))}
-              style={{ verticalAlign: 'middle', width: '90px' }}
-            />
-            <span style={{ marginLeft: '0.4rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>
-              {speedMs}ms
-            </span>
-          </div>
         </div>
 
-        {/* Live Map Display */}
-        <div className="romania-svg-wrapper">
-          <svg viewBox="0 0 1000 720" style={{ width: '100%', height: '100%' }}>
-            {/* Render Road Edges */}
+        {/* Integrated Laboratory Hardware Transport Deck */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <TransportDeck
+            isPlaying={isPlaying}
+            onPlayToggle={() => setIsPlaying(!isPlaying)}
+            onStepForward={stepSearch}
+            onStepBackward={stepBackward}
+            onReset={resetSearch}
+            speedMs={speedMs}
+            onSpeedChange={setSpeedMs}
+            canStepForward={!isFinished && frontier.length > 0}
+            canStepBackward={history.length > 0}
+            stepCount={stepCount}
+          />
+        </div>
+
+        {/* Live Topographic Radar Map Display */}
+        <div
+          className="romania-svg-wrapper"
+          style={{
+            background: 'radial-gradient(circle at 50% 50%, #0a111c 0%, #06090e 100%)',
+            border: '1px solid #1c2738',
+            borderRadius: '8px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <svg viewBox="0 0 1000 720" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <defs>
+              <radialGradient id="beaconGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="#C6F277" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#C6F277" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+
+            {/* Topographic Altitude Contour Grid */}
+            <g opacity="0.1" stroke="#78D5E8" strokeWidth="0.75" fill="none">
+              <ellipse cx="500" cy="360" rx="420" ry="280" strokeDasharray="5 5" />
+              <ellipse cx="500" cy="360" rx="300" ry="200" strokeDasharray="5 5" />
+              <ellipse cx="500" cy="360" rx="180" ry="120" strokeDasharray="5 5" />
+            </g>
+
+            {/* Road Edges */}
             {Object.entries(ROMANIA_GRAPH).map(([cityName, city]) =>
               city.connections.map((conn) => {
                 const targetCity = ROMANIA_GRAPH[conn.target];
-                if (!targetCity || cityName > conn.target) return null; // Draw each edge once
+                if (!targetCity || cityName > conn.target) return null;
                 const isSolEdge =
                   solutionPath &&
                   solutionPath.includes(cityName) &&
@@ -442,22 +569,28 @@ export const RomaniaGraphVisualizer: React.FC = () => {
                       y1={city.y}
                       x2={targetCity.x}
                       y2={targetCity.y}
-                      className={`graph-edge ${isSolEdge ? 'solution' : ''}`}
+                      stroke={isSolEdge ? '#C6F277' : 'rgba(120, 213, 232, 0.22)'}
+                      strokeWidth={isSolEdge ? 3.5 : 1.5}
+                      strokeLinecap="round"
                     />
                     <rect
                       x={midX - 14}
                       y={midY - 9}
                       width="28"
                       height="18"
-                      fill="#080b11"
-                      rx="4"
-                      opacity="0.85"
+                      fill="#06090e"
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth="1"
+                      rx="3"
                     />
                     <text
                       x={midX}
                       y={midY + 4}
                       textAnchor="middle"
-                      className="graph-edge-text"
+                      fill={isSolEdge ? '#C6F277' : '#94A3B8'}
+                      fontSize="10"
+                      fontFamily="var(--font-mono)"
+                      fontWeight="600"
                     >
                       {conn.cost}
                     </text>
@@ -466,27 +599,62 @@ export const RomaniaGraphVisualizer: React.FC = () => {
               })
             )}
 
-            {/* Render City Nodes */}
+            {/* City Nodes */}
             {Object.entries(ROMANIA_GRAPH).map(([name, city]) => {
               const isFrontier = frontier.some((n) => n.state === name);
               const isCurrent = currentNode?.state === name;
               const isClosed = explored.includes(name);
               const isGoal = name === goalCity;
 
-              let nodeClass = 'default';
-              if (isGoal) nodeClass = 'goal';
-              else if (isCurrent) nodeClass = 'current';
-              else if (isFrontier) nodeClass = 'frontier';
-              else if (isClosed) nodeClass = 'explored';
+              let nodeColor = '#334155';
+              let ringColor = 'rgba(255,255,255,0.1)';
+              if (isGoal) {
+                nodeColor = '#C6F277';
+                ringColor = '#C6F277';
+              } else if (isCurrent) {
+                nodeColor = '#78D5E8';
+                ringColor = '#78D5E8';
+              } else if (isFrontier) {
+                nodeColor = '#38bdf8';
+                ringColor = 'rgba(56, 189, 248, 0.5)';
+              } else if (isClosed) {
+                nodeColor = '#6366f1';
+                ringColor = 'rgba(99, 102, 241, 0.4)';
+              }
 
               return (
-                <g key={name} transform={`translate(${city.x}, ${city.y})`}>
-                  <circle r={isCurrent ? 18 : 14} className={`city-circle ${nodeClass}`} />
-                  <text y={isCurrent ? -22 : -18} textAnchor="middle" className="city-label">
+                <g key={name} transform={`translate(${city.x}, ${city.y})`} style={{ cursor: 'pointer' }}>
+                  {/* Radiating Radar Ring on Current */}
+                  {isCurrent && (
+                    <circle r="26" fill="url(#beaconGlow)" opacity="0.6">
+                      <animate attributeName="r" values="18;32;18" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                  )}
+
+                  <circle r={isCurrent ? 16 : 12} fill="#06090e" stroke={ringColor} strokeWidth={isCurrent ? 3 : 1.5} />
+                  <circle r={isCurrent ? 8 : 6} fill={nodeColor} />
+
+                  <text
+                    y={isCurrent ? -22 : -16}
+                    textAnchor="middle"
+                    fill={isCurrent ? '#78D5E8' : isGoal ? '#C6F277' : '#F1F5F9'}
+                    fontSize={isCurrent ? 13 : 11}
+                    fontWeight={isCurrent || isGoal ? 700 : 500}
+                    fontFamily="var(--font-sans)"
+                  >
                     {name}
                   </text>
-                  <text y={4} textAnchor="middle" className="city-heuristic">
-                    {city.straightLineToBucharest}
+
+                  {/* Straight-line distance heuristic tag */}
+                  <text
+                    y={isCurrent ? 28 : 22}
+                    textAnchor="middle"
+                    fill="var(--lab-accent-amber)"
+                    fontSize="9"
+                    fontFamily="var(--font-mono)"
+                    fontWeight="600"
+                  >
+                    h={city.straightLineToBucharest}
                   </text>
                 </g>
               );
@@ -494,130 +662,74 @@ export const RomaniaGraphVisualizer: React.FC = () => {
           </svg>
         </div>
 
-        {/* Status & Queue Telemetry */}
-        <div style={{ marginTop: '1.25rem' }}>
-          <div
-            style={{
-              padding: '0.75rem 1rem',
-              background: 'var(--bg-card)',
-              borderRadius: 'var(--radius-md)',
-              borderLeft: '4px solid var(--accent-cyan)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.85rem',
-              color: 'var(--text-primary)',
-              marginBottom: '1rem',
-            }}
-          >
-            {statusMessage}
+        {/* Real-time Status Readout */}
+        <div
+          style={{
+            margin: '1rem 0',
+            padding: '0.75rem 1rem',
+            background: 'linear-gradient(90deg, rgba(120, 213, 232, 0.08) 0%, rgba(6, 9, 14, 0.8) 100%)',
+            borderRadius: '6px',
+            borderLeft: '4px solid var(--lab-accent-cyan)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.82rem',
+            color: '#F1F5F9',
+          }}
+        >
+          {statusMessage}
+        </div>
+
+        {/* Dual Telemetry: Synchronized Pseudocode + Priority Queue Inspector */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+          {/* Synchronized Pseudocode Viewer */}
+          <div>
+            <PseudocodeViewer
+              title={`${selectedAlgo.toUpperCase()} ENGINE PSEUDOCODE`}
+              lines={PSEUDOCODE_LINES[selectedAlgo] || PSEUDOCODE_LINES.astar}
+              activeLineIndex={activeLineIndex}
+            />
           </div>
 
-          <div className="grid-2">
-            {/* Frontier Priority Queue Inspector */}
-            <div className="card" style={{ padding: '1rem' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '0.75rem',
-                }}
-              >
-                <span style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--accent-amber)' }}>
-                  Frontier Open Set ({frontier.length} nodes)
-                </span>
-                <span className="badge badge-amber font-mono">
-                  {selectedAlgo === 'bfs'
-                    ? 'FIFO Queue'
-                    : selectedAlgo === 'dfs'
-                    ? 'LIFO Stack'
-                    : 'Priority Queue'}
-                </span>
-              </div>
-              <div
-                style={{
-                  maxHeight: '180px',
-                  overflowY: 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.4rem',
-                }}
-              >
-                {frontier.length === 0 ? (
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Frontier is empty.</div>
-                ) : (
-                  frontier.slice(0, 8).map((node, i) => (
-                    <div
-                      key={node.id || i}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        background: 'rgba(0,0,0,0.3)',
-                        padding: '0.4rem 0.6rem',
-                        borderRadius: '6px',
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      <span style={{ fontWeight: 600, color: '#f8fafc' }}>
-                        {i === 0 ? '▶ ' : ''}
-                        {node.state} (d={node.depth})
-                      </span>
-                      <span style={{ color: 'var(--text-secondary)' }}>
-                        g=<span style={{ color: 'var(--cost-g)' }}>{node.g}</span> | h=
-                        <span style={{ color: 'var(--cost-h)' }}>{node.h}</span> | f=
-                        <span style={{ color: 'var(--cost-f)', fontWeight: 700 }}>{node.f}</span>
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
+          {/* Frontier Priority Queue Inspector */}
+          <div className="card" style={{ padding: '0.85rem', background: '#070a11', border: '1px solid #1a2537' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+              <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--lab-accent-cyan)' }}>
+                PRIORITY QUEUE // FRONTIER ({frontier.length})
+              </span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--lab-text-muted)', fontFamily: 'var(--font-mono)' }}>
+                COST: {totalCost} km
+              </span>
             </div>
 
-            {/* Search Statistics */}
-            <div className="card" style={{ padding: '1rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.75rem', color: '#38bdf8' }}>
-                Search Telemetry & Cost
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Nodes Expanded</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                    {stepCount}
-                  </div>
+            <div style={{ maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {frontier.length === 0 ? (
+                <div style={{ color: 'var(--lab-text-muted)', fontSize: '0.75rem', padding: '0.5rem', fontFamily: 'var(--font-mono)' }}>
+                  Queue empty.
                 </div>
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Explored States</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
-                    {explored.length}
-                  </div>
-                </div>
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Total Path Cost</div>
+              ) : (
+                frontier.slice(0, 8).map((node, i) => (
                   <div
+                    key={node.id}
                     style={{
-                      fontSize: '1.2rem',
-                      fontWeight: 700,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '0.35rem 0.6rem',
+                      background: i === 0 ? 'rgba(120, 213, 232, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                      border: i === 0 ? '1px solid #78D5E8' : '1px solid #162232',
+                      borderRadius: '4px',
+                      fontSize: '0.76rem',
                       fontFamily: 'var(--font-mono)',
-                      color: isFinished ? 'var(--accent-emerald)' : 'var(--text-primary)',
                     }}
                   >
-                    {totalCost > 0 ? `${totalCost} km` : 'In progress'}
+                    <span style={{ fontWeight: 600, color: i === 0 ? '#C6F277' : '#F1F5F9' }}>
+                      #{i + 1} {node.state}
+                    </span>
+                    <span style={{ color: 'var(--lab-text-muted)' }}>
+                      g:{node.g} | h:{node.h} | <strong style={{ color: '#78D5E8' }}>f:{node.f}</strong>
+                    </span>
                   </div>
-                </div>
-                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.6rem', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Status</div>
-                  <div
-                    style={{
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      color: isFinished ? 'var(--accent-emerald)' : 'var(--accent-amber)',
-                    }}
-                  >
-                    {isFinished ? 'Completed' : 'Running'}
-                  </div>
-                </div>
-              </div>
+                ))
+              )}
             </div>
           </div>
         </div>

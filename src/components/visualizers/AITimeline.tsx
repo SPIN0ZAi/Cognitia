@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { History } from 'lucide-react';
+import { CoordinateStamp } from '../common/InstrumentControls';
+import { useLabTheme } from '../../context/LabThemeContext';
 
 interface TimelineEvent {
   year: string;
   title: string;
   people?: string;
   category: 'Origins' | 'Early AI' | 'Winter & Revival' | 'Deep Learning' | 'GenAI & Agents';
+  eventType: 'theory' | 'breakthrough' | 'winter' | 'system' | 'foundation';
   description: string;
+  quote?: string;
   slideRef: number;
 }
 
@@ -16,15 +20,18 @@ const TIMELINE_EVENTS: TimelineEvent[] = [
     title: 'Syllogisms & Formal Logic',
     people: 'Aristotle',
     category: 'Origins',
-    description: 'First formal system for codifying deductive rational reasoning.',
+    eventType: 'theory',
+    description: 'First formal system for codifying deductive rational reasoning through categorical syllogisms.',
+    quote: 'A syllogism is discourse in which, certain things being stated, something other than what is stated follows of necessity.',
     slideRef: 18,
   },
   {
     year: '1837',
-    title: 'Propositional & Boolean Logic',
+    title: 'Propositional & Boolean Algebra',
     people: 'George Boole',
     category: 'Origins',
-    description: 'Reduced logical reasoning to binary algebraic manipulation.',
+    eventType: 'theory',
+    description: 'Reduced logical human reasoning to binary algebraic manipulation: 1 and 0, AND, OR, NOT operations.',
     slideRef: 18,
   },
   {
@@ -32,7 +39,9 @@ const TIMELINE_EVENTS: TimelineEvent[] = [
     title: 'First Model of Artificial Neuron',
     people: 'Warren McCulloch & Walter Pitts',
     category: 'Origins',
-    description: 'Modeled dendrites, cell summation, and threshold axon output.',
+    eventType: 'breakthrough',
+    description: 'Modeled dendrites, cell summation, and all-or-none axon firing threshold logic.',
+    quote: 'A logical calculus of the ideas immanent in nervous activity.',
     slideRef: 18,
   },
   {
@@ -40,125 +49,145 @@ const TIMELINE_EVENTS: TimelineEvent[] = [
     title: 'Computing Machinery & Intelligence (Turing Test)',
     people: 'Alan Turing',
     category: 'Early AI',
-    description: 'Introduced the imitation game, machine learning, and genetic algorithms.',
+    eventType: 'foundation',
+    description: 'Introduced the imitation game, machine learning from experience, genetic algorithms, and the Turing Test.',
+    quote: 'We may hope that machines will eventually compete with men in all purely intellectual fields.',
     slideRef: 19,
   },
   {
     year: '1956',
-    title: 'Dartmouth Conference: Birth of AI',
-    people: 'John McCarthy, M. Minsky, C. Shannon, N. Rochester',
+    title: 'Dartmouth Summer Conference: Birth of AI',
+    people: 'John McCarthy, Marvin Minsky, Claude Shannon, Nathaniel Rochester',
     category: 'Early AI',
-    description: 'Coined the term "Artificial Intelligence" and established it as a scientific discipline.',
+    eventType: 'breakthrough',
+    description: 'Coined the term "Artificial Intelligence" and established AI as an autonomous scientific discipline.',
+    quote: 'Every aspect of learning or any other feature of intelligence can in principle be so precisely described that a machine can be made to simulate it.',
     slideRef: 19,
   },
   {
     year: '1959',
-    title: 'First Artificial Neural Network (ADALINE)',
+    title: 'First Adaptive Neural Network (ADALINE)',
     people: 'Bernard Widrow & Ted Hoff',
     category: 'Early AI',
-    description: 'First neural network applied to an industrial telecommunications filter.',
+    eventType: 'system',
+    description: 'First physical neural network with adaptive weights applied to an industrial telecommunications echo filter.',
     slideRef: 19,
   },
   {
     year: '1964',
-    title: 'ELIZA: Natural Language Psychotherapist',
-    people: 'Joseph Weizenbaum',
+    title: 'ELIZA: First Conversational Psychotherapist',
+    people: 'Joseph Weizenbaum (MIT)',
     category: 'Early AI',
-    description: 'First conversational pattern-matching chatbot precursor.',
+    eventType: 'system',
+    description: 'Simulated Rogerian psychotherapist via pattern matching and keyword substitution script rules.',
     slideRef: 19,
   },
   {
     year: '1967',
-    title: 'DENDRAL: First Expert System (KBS)',
-    people: 'Edward Feigenbaum et al.',
+    title: 'DENDRAL: First Knowledge-Based Expert System',
+    people: 'Edward Feigenbaum, Bruce Buchanan, Joshua Lederberg',
     category: 'Early AI',
-    description: 'Inferred molecular structures from chemical mass spectrometry data.',
+    eventType: 'system',
+    description: 'Inferred complex molecular structures from chemical mass spectrometry data using domain heuristics.',
     slideRef: 19,
   },
   {
     year: '1979',
-    title: 'MYCIN: Medical Diagnosis KBS',
-    people: 'Edward Shortliffe',
+    title: 'MYCIN: Medical Diagnosis System',
+    people: 'Edward Shortliffe (Stanford)',
     category: 'Early AI',
-    description: 'Competitive with human specialists for infectious blood diseases (~600 rules).',
+    eventType: 'system',
+    description: 'Diagnosed bacteremia and meningitis (~600 rules) incorporating certainty factors for uncertain reasoning.',
     slideRef: 19,
   },
   {
     year: '1980–88',
     title: 'Industrial Expert Systems Boom',
-    people: 'Commercial Industry',
+    people: 'Commercial AI Industry',
     category: 'Winter & Revival',
-    description: 'Corporations deployed rule-based systems; massive investment in LISP machines.',
+    eventType: 'system',
+    description: 'Corporations deployed rule-based inference engines; global commercial boom in specialized LISP machines.',
     slideRef: 20,
   },
   {
     year: '1986',
-    title: 'Backpropagation Revival',
-    people: 'Rumelhart, Hinton, Williams',
+    title: 'Backpropagation Multi-Layer Revival',
+    people: 'David Rumelhart, Geoffrey Hinton, Ronald Williams',
     category: 'Winter & Revival',
-    description: 'Revived multi-layer neural networks via gradient descent backpropagation.',
+    eventType: 'breakthrough',
+    description: 'Revived connectionism and overcome Minsky’s XOR perceptron limitation via gradient descent backprop.',
     slideRef: 20,
   },
   {
     year: '1988–93',
-    title: 'The AI Winter',
+    title: 'The Second AI Winter: Brittleness & Collapse',
     category: 'Winter & Revival',
-    description: 'High maintenance costs and brittle symbolic rule bases led to massive funding cuts.',
+    eventType: 'winter',
+    description: 'High maintenance costs and brittle symbolic rule bases led to commercial collapse and massive DARPA funding cuts.',
+    quote: 'The knowledge acquisition bottleneck and combinatorial explosion proved insurmountable for hand-coded rules.',
     slideRef: 20,
   },
   {
     year: '1995',
-    title: 'Agent-Based Artificial Intelligence',
+    title: 'Agent-Based AI: Modern Rationality',
     people: 'Stuart Russell & Peter Norvig',
     category: 'Winter & Revival',
-    description: 'Unified the discipline under the rational agent paradigm.',
+    eventType: 'foundation',
+    description: 'Unified the entire discipline under the rational agent paradigm: perceptions, actions, environment, goals.',
     slideRef: 20,
   },
   {
     year: '1997',
-    title: 'Deep Blue Beats Garry Kasparov',
+    title: 'Deep Blue Defeats Garry Kasparov',
     people: 'IBM Research',
     category: 'Winter & Revival',
-    description: 'Specialized alpha-beta search hardware evaluates 200M positions/sec to win in chess.',
+    eventType: 'breakthrough',
+    description: 'Specialized parallel hardware evaluates 200M positions/sec using alpha-beta minimax search to beat the world chess champion.',
     slideRef: 20,
   },
   {
     year: '2002',
-    title: 'Roomba (iRobot)',
+    title: 'Roomba (iRobot) Domestic Autonomy',
+    people: 'Rodney Brooks / iRobot',
     category: 'Deep Learning',
-    description: 'Autonomous behavior-based robotics enters millions of everyday homes.',
+    eventType: 'system',
+    description: 'Subsumption and behavior-based reactive agents bring commercial autonomous robotics to millions of homes.',
     slideRef: 21,
   },
   {
     year: '2011',
-    title: 'Watson Wins Jeopardy! & Virtual Assistants Launch',
-    people: 'IBM, Apple (Siri), Google',
+    title: 'Watson Wins Jeopardy! & Mobile Assistants',
+    people: 'IBM Research, Apple Siri',
     category: 'Deep Learning',
-    description: 'IBM Watson defeats human champions; Siri and voice assistants enter smartphones.',
+    eventType: 'system',
+    description: 'DeepQA natural language processing triumphs over grand champions on live television; smartphones get voice agents.',
     slideRef: 21,
   },
   {
     year: '2012',
-    title: 'AlexNet Wins ImageNet',
-    people: 'Krizhevsky, Sutskever, Hinton',
+    title: 'AlexNet ImageNet Breakthrough',
+    people: 'Alex Krizhevsky, Ilya Sutskever, Geoffrey Hinton',
     category: 'Deep Learning',
-    description: 'Watershed moment: Deep Convolutional Networks on GPUs crush computer vision records.',
+    eventType: 'breakthrough',
+    description: 'Deep Convolutional Neural Networks running on parallel GPUs crush error rates, initiating the modern deep learning era.',
     slideRef: 21,
   },
   {
     year: '2016',
     title: 'AlphaGo Defeats Lee Sedol',
-    people: 'DeepMind',
+    people: 'Google DeepMind',
     category: 'Deep Learning',
-    description: 'Mastered Go using deep reinforcement learning and Monte Carlo Tree Search.',
+    eventType: 'breakthrough',
+    description: 'Overcame the immense 10^170 Go game complexity using Deep Reinforcement Learning and Monte Carlo Tree Search.',
     slideRef: 22,
   },
   {
     year: '2017',
     title: 'The Transformer Architecture',
-    people: 'Vaswani et al. (Google Brain)',
+    people: 'Ashish Vaswani et al. (Google Brain)',
     category: 'GenAI & Agents',
-    description: '"Attention Is All You Need" replaces recurrence, underpinning modern LLMs.',
+    eventType: 'foundation',
+    description: '"Attention Is All You Need" replaces recurrence, scaling self-attention to unlock contemporary foundation models.',
     slideRef: 22,
   },
   {
@@ -166,95 +195,254 @@ const TIMELINE_EVENTS: TimelineEvent[] = [
     title: 'GPT-3 & ChatGPT Launch',
     people: 'OpenAI',
     category: 'GenAI & Agents',
-    description: 'Large language models bring conversational foundation models to a mass audience.',
+    eventType: 'breakthrough',
+    description: 'Emergent zero-shot and few-shot reasoning in large autoregressive models brings conversational AI to the general public.',
     slideRef: 22,
   },
   {
     year: '2025–26',
-    title: 'Reasoning Models & Agentic AI',
+    title: 'Inference Reasoning & Autonomous Tool Agents',
     category: 'GenAI & Agents',
-    description: 'Inference test-time compute, autonomous tool use, self-reflection, and physical embodied AI.',
+    eventType: 'foundation',
+    description: 'System 2 inference compute scaling, self-reflective chain-of-thought, tool-calling agents, and embodied intelligence.',
     slideRef: 23,
   },
 ];
 
+const ERAS = [
+  { id: 'All', label: 'Complete Epoch (300 BC – 2026)' },
+  { id: 'Origins', label: '1. Foundations & Pre-History' },
+  { id: 'Early AI', label: '2. The Dartmouth Golden Age' },
+  { id: 'Winter & Revival', label: '3. Winter & Agent Renaissance' },
+  { id: 'Deep Learning', label: '4. Deep Connectionist Revolution' },
+  { id: 'GenAI & Agents', label: '5. Transformers & Modern Agents' },
+];
+
 export const AITimeline: React.FC = () => {
-  const [activeFilter, setActiveFilter] = useState<string>('All');
+  const { playClick } = useLabTheme();
+  const [activeEra, setActiveEra] = useState<string>('All');
+  const [selectedEventIndex, setSelectedEventIndex] = useState<number>(0);
 
   const filtered =
-    activeFilter === 'All'
+    activeEra === 'All'
       ? TIMELINE_EVENTS
-      : TIMELINE_EVENTS.filter((e) => e.category === activeFilter);
+      : TIMELINE_EVENTS.filter((e) => e.category === activeEra);
+
+  const selectedEvent = filtered[selectedEventIndex] || filtered[0] || TIMELINE_EVENTS[0];
+
+  const getBadgeForType = (type: TimelineEvent['eventType']) => {
+    switch (type) {
+      case 'breakthrough':
+        return <span className="badge badge-lime font-mono">⚡ BREAKTHROUGH</span>;
+      case 'winter':
+        return <span className="badge badge-rose font-mono">❄️ AI WINTER</span>;
+      case 'foundation':
+        return <span className="badge badge-cyan font-mono">🏛️ FOUNDATION</span>;
+      case 'system':
+        return <span className="badge badge-amber font-mono">🤖 APPLIED SYSTEM</span>;
+      default:
+        return <span className="badge badge-indigo font-mono">📐 FORMAL THEORY</span>;
+    }
+  };
 
   return (
-    <div className="visualizer-container">
+    <div className="visualizer-container" style={{ background: 'var(--lab-bg-surface)', border: '1px solid var(--lab-border-subtle)' }}>
+      {/* Top Coordinate Stamp */}
+      <CoordinateStamp
+        sectionCode="HIST:01 // CHRONO_ATLAS"
+        statusText={`ERA_${activeEra.toUpperCase()}_ENGAGED`}
+        coords="300_BC_TO_2026_AD // 21_LANDMARKS"
+      />
+
       <div className="visualizer-header">
         <div className="visualizer-title-area">
-          <div className="visualizer-title">
-            <History size={18} className="text-cyan-400" />
-            Evolution of Artificial Intelligence: 300 BC to 2026 (Lesson 1)
+          <div className="visualizer-title" style={{ fontFamily: 'var(--font-display)', fontSize: '1.25rem', color: '#F1F5F9' }}>
+            <History size={19} className="text-cyan-400" />
+            Archival Chrono-Atlas: The Evolution of Artificial Intelligence
           </div>
-          <div className="visualizer-subtitle">
-            Historical Cycles, Symbolic Booms, AI Winters & The Modern Generative Wave
+          <div className="visualizer-subtitle" style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem' }}>
+            From Classical Syllogisms &amp; Dartmouth 1956 to Deep Learning &amp; Autonomous Rational Agents (Lesson 1)
           </div>
-        </div>
-
-        <div className="visualizer-controls">
-          {['All', 'Origins', 'Early AI', 'Winter & Revival', 'Deep Learning', 'GenAI & Agents'].map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setActiveFilter(cat)}
-              className={`btn-tactile btn-sm ${activeFilter === cat ? 'btn-primary' : ''}`}
-              style={{ fontSize: '0.72rem' }}
-            >
-              {cat}
-            </button>
-          ))}
         </div>
       </div>
 
-      <div className="visualizer-body" style={{ maxHeight: '480px', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          {filtered.map((evt, idx) => (
-            <div
-              key={idx}
-              style={{
-                display: 'flex',
-                gap: '1rem',
-                padding: '0.9rem 1.1rem',
-                borderRadius: '8px',
-                background: 'rgba(0,0,0,0.25)',
-                border: '1px solid var(--border-subtle)',
-                alignItems: 'flex-start',
-              }}
-            >
-              <div
+      <div className="visualizer-body">
+        {/* Era Segmented Navigation Bar */}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '0.4rem',
+            marginBottom: '1.5rem',
+            padding: '0.4rem',
+            background: '#070a10',
+            borderRadius: '6px',
+            border: '1px solid var(--lab-border-subtle)',
+          }}
+        >
+          {ERAS.map((era) => {
+            const isActive = activeEra === era.id;
+            return (
+              <button
+                key={era.id}
+                onClick={() => {
+                  playClick('toggle');
+                  setActiveEra(era.id);
+                  setSelectedEventIndex(0);
+                }}
+                className={`btn-tactile btn-sm ${isActive ? 'btn-primary' : ''}`}
                 style={{
-                  minWidth: '85px',
+                  fontSize: '0.73rem',
+                  padding: '0.3rem 0.65rem',
                   fontFamily: 'var(--font-mono)',
-                  fontSize: '0.85rem',
-                  fontWeight: 700,
-                  color: 'var(--accent-cyan)',
+                  flexGrow: 1,
                 }}
               >
-                {evt.year}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <strong style={{ fontSize: '0.92rem', color: '#f8fafc' }}>{evt.title}</strong>
-                  <span className="slide-citation">Slide {evt.slideRef}</span>
+                {era.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Chronological Archival Stage (Dual View: Featured Landmark + Scrubbable Timeline Rail) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginBottom: '1rem' }}>
+          {/* Featured Historical Document / Landmark Card */}
+          <div
+            className="card"
+            style={{
+              padding: '1.5rem',
+              background:
+                selectedEvent.category === 'Origins' || selectedEvent.category === 'Early AI'
+                  ? 'linear-gradient(135deg, rgba(235, 229, 216, 0.04) 0%, #0d121b 100%)'
+                  : 'linear-gradient(135deg, #0e1522 0%, #080c14 100%)',
+              border: '1px solid var(--lab-border-subtle)',
+              borderLeft:
+                selectedEvent.eventType === 'winter'
+                  ? '4px solid #f87171'
+                  : selectedEvent.eventType === 'breakthrough'
+                  ? '4px solid #C6F277'
+                  : '4px solid #78D5E8',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '1.5rem',
+                    fontWeight: 800,
+                    color: 'var(--lab-accent-cyan)',
+                    letterSpacing: '-0.02em',
+                  }}
+                >
+                  {selectedEvent.year}
+                </span>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  {getBadgeForType(selectedEvent.eventType)}
+                  <span className="slide-citation">Slide {selectedEvent.slideRef}</span>
                 </div>
-                {evt.people && (
-                  <div style={{ fontSize: '0.78rem', color: 'var(--accent-amber)', margin: '0.15rem 0' }}>
-                    {evt.people}
-                  </div>
-                )}
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  {evt.description}
-                </div>
               </div>
+
+              <h3 className="font-display" style={{ fontSize: '1.3rem', fontWeight: 700, color: '#F1F5F9', marginBottom: '0.4rem' }}>
+                {selectedEvent.title}
+              </h3>
+
+              {selectedEvent.people && (
+                <div style={{ fontSize: '0.82rem', color: 'var(--lab-accent-amber)', fontFamily: 'var(--font-mono)', marginBottom: '0.85rem', fontWeight: 600 }}>
+                  Principals: {selectedEvent.people}
+                </div>
+              )}
+
+              <p style={{ fontSize: '0.92rem', color: 'var(--lab-text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+                {selectedEvent.description}
+              </p>
+
+              {/* Archival Quotation in Editorial Serif */}
+              {selectedEvent.quote && (
+                <div
+                  className="archival-quote"
+                  style={{
+                    margin: '1rem 0 0 0',
+                    fontSize: '0.94rem',
+                    color: 'var(--lab-parchment)',
+                    background: 'rgba(235, 229, 216, 0.05)',
+                  }}
+                >
+                  &ldquo;{selectedEvent.quote}&rdquo;
+                </div>
+              )}
             </div>
-          ))}
+
+            <div style={{ marginTop: '1.5rem', paddingTop: '0.75rem', borderTop: '1px solid var(--lab-border-subtle)', display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--lab-text-muted)' }}>
+              <span>Historical Classification: {selectedEvent.category}</span>
+              <span>UCLM AI Syllabus Ch. 2</span>
+            </div>
+          </div>
+
+          {/* Interactive Scrubbable Chrono Rail (All Milestones in Active Era) */}
+          <div
+            style={{
+              maxHeight: '440px',
+              overflowY: 'auto',
+              paddingRight: '0.4rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+            }}
+          >
+            {filtered.map((evt, idx) => {
+              const isSelected = selectedEvent.title === evt.title;
+              return (
+                <div
+                  key={idx}
+                  onClick={() => {
+                    playClick('soft');
+                    setSelectedEventIndex(idx);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.85rem',
+                    padding: '0.65rem 0.85rem',
+                    borderRadius: '6px',
+                    background: isSelected ? 'rgba(120, 213, 232, 0.12)' : 'rgba(255, 255, 255, 0.02)',
+                    border: isSelected ? '1px solid #78D5E8' : '1px solid #162030',
+                    cursor: 'pointer',
+                    transition: 'all 0.12s ease',
+                  }}
+                  data-cursor-label={`INSPECT_${evt.year}`}
+                >
+                  <div
+                    style={{
+                      minWidth: '65px',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.82rem',
+                      fontWeight: 700,
+                      color: isSelected ? '#C6F277' : 'var(--lab-accent-cyan)',
+                    }}
+                  >
+                    {evt.year}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#F1F5F9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {evt.title}
+                    </div>
+                    {evt.people && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--lab-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {evt.people}
+                      </div>
+                    )}
+                  </div>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--lab-text-hairline)', fontFamily: 'var(--font-mono)' }}>
+                    P.{evt.slideRef}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
