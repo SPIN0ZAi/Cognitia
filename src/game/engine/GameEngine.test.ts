@@ -287,6 +287,16 @@ function runFidelityTests() {
   assert('Player position is reset to spawn (13.5, 23)', deathEngine.player.x === 13.5 && deathEngine.player.y === 23, `Pos: (${deathEngine.player.x}, ${deathEngine.player.y})`);
   assert('Ghosts are reset to house / pen door', deathEngine.ghosts.find(g => g.personality === 'blinky')?.y === 11, `Blinky y: ${deathEngine.ghosts[0].y}`);
   assert('Player has temporary invulnerability on spawn', deathEngine.player.invulnerableTimer > 0, `Invuln: ${deathEngine.player.invulnerableTimer}`);
+  assert('Player is stationary on spawn without moving on its own', deathEngine.player.dir === 'none', `Dir: ${deathEngine.player.dir}`);
+
+  // Confirm game does NOT auto-start on its own even after 5 seconds
+  deathEngine.update(5.0);
+  assert('Game waits in ready state and does NOT start on its own', deathEngine.state === 'ready', `State: ${deathEngine.state}`);
+
+  // Starts only when player provides direction input
+  deathEngine.setPlayerDirection('left');
+  assert('Game starts running only when player provides input', deathEngine.state === 'running', `State: ${deathEngine.state}`);
+  assert('Player moves in inputted direction', deathEngine.player.dir === 'left', `Dir: ${deathEngine.player.dir}`);
 
   console.log(`\nResults: ${passed} / ${total} authentic arcade fidelity tests passed.`);
   if (passed !== total) {

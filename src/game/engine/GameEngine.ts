@@ -89,7 +89,7 @@ export class GameEngine {
     this.player = {
       x: this.maze.playerSpawn.x,
       y: this.maze.playerSpawn.y,
-      dir: 'left',
+      dir: 'none',
       nextDir: 'none',
       speed: 6.0, // 80% base speed (7.5 * 0.8 = 6.0 tiles/sec)
       lives: 3,
@@ -239,6 +239,7 @@ export class GameEngine {
     if (this.state === 'player_caught') return; // Cannot steer while dying!
     this.player.nextDir = dir;
     if (this.state === 'ready' && dir !== 'none') {
+      this.player.dir = dir;
       this.start();
     }
   }
@@ -266,7 +267,7 @@ export class GameEngine {
     // Reset player position
     this.player.x = this.maze.playerSpawn.x;
     this.player.y = this.maze.playerSpawn.y;
-    this.player.dir = 'left';
+    this.player.dir = 'none';
     this.player.nextDir = 'none';
     this.player.eatPauseFrames = 0;
     this.player.invulnerableTimer = 2.0;
@@ -319,11 +320,7 @@ export class GameEngine {
    */
   public update(realDeltaSeconds: number): void {
     if (this.state === 'ready') {
-      this.readyTimer -= realDeltaSeconds;
-      if (this.readyTimer <= 0) {
-        this.state = 'running';
-        this.events.onStateChange?.(this.state);
-      }
+      // Wait for player explicit input (arrow keys, WASD, touch D-pad, or click Start/Continue)
       return;
     }
 
