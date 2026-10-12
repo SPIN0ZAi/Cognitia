@@ -1,134 +1,199 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { BookmarkItem, StudyProgress } from '../types/course';
+import type { CognitiaStorageV1, CombinedProgressSummary } from '../lib/storage/types';
+import {
+  loadStorage,
+  saveStorage,
+  resetStorage,
+  exportProgressJSON,
+  importProgressFromJSON,
+  initCrossTabSync,
+  calculateCombinedProgress,
+} from '../lib/storage/storageManager';
 
 interface StudyContextType {
+  storageData: CognitiaStorageV1;
   progress: StudyProgress;
+  combinedProgress: CombinedProgressSummary;
+  isStorageBlocked: boolean;
+  isMigrated: boolean;
   markSectionComplete: (lessonId: string, sectionId: string) => void;
   toggleBookmark: (item: Omit<BookmarkItem, 'timestamp'>) => void;
   isBookmarked: (lessonId: string, sectionId: string) => boolean;
   recordQuizResult: (questionId: string, correct: boolean, selected: any) => void;
   setLastVisited: (lessonId: string, sectionId: string) => void;
+  recordSimulatorRun: (simulatorId: string, algo?: string) => void;
   resetProgress: () => void;
+  exportJSON: () => string;
+  importJSON: (jsonStr: string) => boolean;
   activeSearchOpen: boolean;
   setActiveSearchOpen: (open: boolean) => void;
 }
 
-const STORAGE_KEY = 'cognitia_study_progress_v1';
-
-const defaultProgress: StudyProgress = {
-  completedSections: {},
-  quizScores: {},
-  lastVisited: {
-    lessonId: 'lesson-1',
-    sectionId: 'what-is-ai',
-    timestamp: Date.now(),
-  },
-  bookmarks: [],
-};
-
 const StudyContext = createContext<StudyContextType | undefined>(undefined);
 
 export const StudyProvider = ({ children }: { children: ReactNode }) => {
-  const [progress, setProgress] = useState<StudyProgress>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Failed to load study progress from localStorage', e);
-    }
-    return defaultProgress;
-  });
-
+  const [initResult] = useState(() => loadStorage());
+  const [storageData, setStorageData] = useState<CognitiaStorageV1>(initResult.data);
+  const [isStorageBlocked] = useState<boolean>(initResult.isBlocked);
+  const [isMigrated] = useState<boolean>(initResult.isMigrated);
   const [activeSearchOpen, setActiveSearchOpen] = useState(false);
 
+  // Cross-tab synchronization
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-    } catch (e) {
-      console.warn('Failed to save study progress to localStorage', e);
-    }
-  }, [progress]);
+    const cleanup = initCrossTabSync((synced: CognitiaStorageV1) => {
+      setStorageData(synced);
+    });
+    return cleanup;
+  }, []);
+
+  // Sync to localStorage with debounce
+  useEffect(() => {
+    saveStorage(storageData);
+  }, [storageData]);
 
   const markSectionComplete = (lessonId: string, sectionId: string) => {
     const key = `${lessonId}:${sectionId}`;
-    setProgress((prev) => ({
-      ...prev,
-      completedSections: {
-        ...prev.completedSections,
-        [key]: !prev.completedSections[key],
-      },
-    }));
+    setStorageData((prev) => {
+      const nextCompleted = {
+        ...prev.study.completedSections,
+        [key]: !prev.study.completedSections[key],
+      };
+      return {
+        ...prev,
+        study: {
+          ...prev.study,
+          completedSections: nextCompleted,
+        },
+      };
+    });
   };
 
   const toggleBookmark = (item: Omit<BookmarkItem, 'timestamp'>) => {
-    setProgress((prev) => {
-      const exists = prev.bookmarks.some((b) => b.id === item.id);
+    setStorageData((prev) => {
+      const exists = prev.study.bookmarks.some((b) => b.id === item.id);
+      let nextBookmarks: BookmarkItem[];
       if (exists) {
-        return {
-          ...prev,
-          bookmarks: prev.bookmarks.filter((b) => b.id !== item.id),
-        };
+        nextBookmarks = prev.study.bookmarks.filter((b) => b.id !== item.id);
       } else {
-        return {
-          ...prev,
-          bookmarks: [...prev.bookmarks, { ...item, timestamp: Date.now() }],
-        };
+        nextBookmarks = [...prev.study.bookmarks, { ...item, timestamp: Date.now() }];
       }
+      return {
+        ...prev,
+        study: {
+          ...prev.study,
+          bookmarks: nextBookmarks,
+        },
+      };
     });
   };
 
   const isBookmarked = (lessonId: string, sectionId: string) => {
-    return progress.bookmarks.some(
+    return storageData.study.bookmarks.some(
       (b) => b.lessonId === lessonId && b.sectionId === sectionId
     );
   };
 
   const recordQuizResult = (questionId: string, correct: boolean, selected: any) => {
-    setProgress((prev) => ({
+    setStorageData((prev) => ({
       ...prev,
-      quizScores: {
-        ...prev.quizScores,
-        [questionId]: {
-          answered: true,
-          correct,
-          selected,
+      study: {
+        ...prev.study,
+        quizScores: {
+          ...prev.study.quizScores,
+          [questionId]: {
+            answered: true,
+            correct,
+            selected,
+            timestamp: Date.now(),
+          },
         },
       },
     }));
   };
 
   const setLastVisited = (lessonId: string, sectionId: string) => {
-    setProgress((prev) => ({
+    setStorageData((prev) => ({
       ...prev,
-      lastVisited: {
-        lessonId,
-        sectionId,
-        timestamp: Date.now(),
+      study: {
+        ...prev.study,
+        lastVisited: {
+          lessonId,
+          sectionId,
+          timestamp: Date.now(),
+        },
       },
     }));
   };
 
+  const recordSimulatorRun = (simulatorId: string, algo?: string) => {
+    setStorageData((prev) => {
+      const sim = prev.study.simulatorUsage[simulatorId] || {
+        runs: 0,
+        algorithmsTried: [],
+        lastUsed: 0,
+      };
+      const algos = new Set(sim.algorithmsTried);
+      if (algo) algos.add(algo);
+
+      return {
+        ...prev,
+        study: {
+          ...prev.study,
+          simulatorUsage: {
+            ...prev.study.simulatorUsage,
+            [simulatorId]: {
+              runs: sim.runs + 1,
+              algorithmsTried: Array.from(algos),
+              lastUsed: Date.now(),
+            },
+          },
+        },
+      };
+    });
+  };
+
   const resetProgress = () => {
-    setProgress(defaultProgress);
+    const fresh = resetStorage();
+    setStorageData(fresh);
+  };
+
+  const exportJSON = () => {
+    return exportProgressJSON(storageData);
+  };
+
+  const importJSON = (jsonStr: string): boolean => {
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      const res = importProgressFromJSON(jsonStr);
+      if (res) {
+        setStorageData(res);
+        return true;
+      }
+      return false;
     } catch (e) {
-      // ignore
+      return false;
     }
   };
+
+  const combinedProgress = calculateCombinedProgress(storageData);
 
   return (
     <StudyContext.Provider
       value={{
-        progress,
+        storageData,
+        progress: storageData.study,
+        combinedProgress,
+        isStorageBlocked,
+        isMigrated,
         markSectionComplete,
         toggleBookmark,
         isBookmarked,
         recordQuizResult,
         setLastVisited,
+        recordSimulatorRun,
         resetProgress,
+        exportJSON,
+        importJSON,
         activeSearchOpen,
         setActiveSearchOpen,
       }}

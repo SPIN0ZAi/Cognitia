@@ -5,6 +5,7 @@ import {
   BookMarked,
   BarChart3,
   CheckCircle2,
+  Gamepad2,
   X,
 } from 'lucide-react';
 import { useStudy } from '../../context/StudyContext';
@@ -70,6 +71,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Home size={15} />
             <span>Course Home</span>
+          </span>
+        </button>
+
+        <button
+          onClick={() => handleItemClick('play')}
+          className={`sidebar-nav-item ${currentView === 'play' ? 'active' : ''}`}
+          style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Gamepad2 size={15} color="var(--lab-accent-lime)" />
+            <span>Learn & Play (Chase)</span>
+          </span>
+          <span className="badge badge-lime font-mono" style={{ fontSize: '0.62rem' }}>
+            ARCADE
           </span>
         </button>
 

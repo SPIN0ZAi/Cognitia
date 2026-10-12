@@ -162,5 +162,62 @@ A fusion of:
 
 ### Phase 5: Visual QA Passes & Cross-Device Tuning
 - [x] Visual QA Pass 1: Contrast, readability, and performance profiling (Verified clean 60fps RAF, 0 React thrash).
-- [ ] Visual QA Pass 2: Mobile responsive audit and touch controls.
+- [x] Visual QA Pass 2: Mobile responsive audit and touch controls (Sliding drawer, fluid 4:3 radar, fluid chessboard, touch ergonomics).
 - [ ] Visual QA Pass 3: Edge-case simulator verification and algorithm regression checks.
+
+---
+
+## 6. MAJOR UPDATE: "LEARN & PLAY" + PERSISTENT PROGRESS ARCHITECTURE
+
+### 6.1 Audit of Existing Systems
+1. **Progress Storage**:
+   - Currently lives in `src/context/StudyContext.tsx` under localStorage key `cognitia_study_progress_v1`.
+   - Stores completed section booleans, quiz scores, last visited section, and bookmarks.
+   - **Gaps**: Lacks schema versioning/migration header, debouncing, cross-tab sync, in-memory fallback for private mode, export/import JSON capability, and tracking for simulator runs, exam streaks, or game achievements.
+2. **Search Algorithms**:
+   - BFS, UCS, DFS, DLS, Greedy, and A* are currently hardcoded inside `RomaniaGraphVisualizer.tsx` and `RomaniaSearchChallenge.tsx`.
+   - Logic is tied directly to `ROMANIA_GRAPH` node structure and React state hooks.
+   - **Requirement**: Must be refactored into a pure, generic `GraphSearch` module (`src/lib/search/GraphSearch.ts`) that accepts arbitrary graphs/state spaces, with tests verifying that Romania results remain 100% identical.
+
+### 6.2 Unified Storage Layer Architecture (`src/lib/storage/`)
+- **Key**: Single namespaced key `cognitia:v1` in `localStorage`.
+- **Migration**: Automated migration function that detects `cognitia_study_progress_v1`, upgrades to `v1` schema without data loss, and initializes default values for game progress and telemetry.
+- **Robustness**:
+  - In-memory fallback if `localStorage` throws (e.g., Safari private mode).
+  - Validation with graceful recovery for corrupted JSON.
+  - Cross-tab synchronization via `window.addEventListener('storage', ...)`.
+  - Debounced persistence writes (200ms) to prevent high-frequency write churn.
+  - Student privacy: 100% client-side functional data only; no tracking or cookies.
+  - Student data control: Export progress (JSON file download), Import progress, and Reset progress (with confirmation).
+
+### 6.3 Shared Generic Graph Search Module (`src/lib/search/`)
+- Generic `GraphSearchProblem<TState>` interface with `initialState`, `isGoal`, `getSuccessors`, `heuristic`, and `stateKey`.
+- Unified implementations of:
+  - **BFS** (FIFO, optimal by unweighted step count).
+  - **UCS / Dijkstra** (Priority Queue by $g(n)$, optimal with weighted costs).
+  - **DFS** (LIFO, deep traversal, suboptimal, cycle prevention).
+  - **Greedy Best-First** (Priority Queue by $h(n)$, eager heuristic pursuit).
+  - **A\*** (Priority Queue by $f(n) = g(n) + h(n)$, optimal with admissible heuristics).
+- Support for both step-by-step generator tracing (for visualizers and X-Ray mode) and batch execution.
+
+### 6.4 "Cognitia Chase" Maze Agents Game Engine (`src/game/`)
+- **Philosophy**: "Learn. Play. Outsmart the algorithm." The enemies *are* the course search algorithms hunting the student in real time.
+- **Pure TypeScript Engine**: `src/game/engine/`
+  - Fixed-timestep loop (60 ticks/second) decoupled from display refresh rate.
+  - Maze graph with weighted tiles (normal = 1, mud = 3, ice = 0.5) and dead-end traps.
+  - 5 distinctive algorithm enemies:
+    1. **The Wave (BFS)** — Cyan phosphor, expands in concentric layers, always takes minimum tile steps.
+    2. **The Miser (UCS)** — Amber coin, avoids high-cost mud and routes around expensive paths.
+    3. **The Plunger (DFS)** — Violet phantom, dives deep into dead ends, easily tricked.
+    4. **The Gambler (Greedy)** — Ruby seeker, rushes directly at the player based on $h(n)$ alone, traps itself in dead-end obstacles.
+    5. **The Strategist (A\*)** — Laser lime mastermind, perfectly balances $g(n) + h(n)$, optimal pursuit.
+- **X-Ray Mode (Signature Feature)**:
+  - Live HUD overlay rendering the selected enemy's search frontier, explored nodes, planned trajectory vector, and live equations: $g(n)$, $h(n)$, $f(n)$.
+- **Game Modes**:
+  1. *Campaign: Learn & Play* — 5 progressive levels with micro-lessons and gated quizzes.
+  2. *Ghost Lab (Sandbox)* — Place custom walls/traps, side-by-side algorithm comparison, and heuristic experiments (Manhattan vs Euclidean vs Inadmissible $3\times$ Manhattan).
+  3. *Be the Agent* — Student navigates the maze manually, graded against the optimal A* search.
+  4. *Arcade / Survival* — Classic endless challenge against all 5 algorithms.
+- **Procedural Audio**:
+  - 100% synthesized Web Audio API chiptune soundscape (blips, radar pings, alarm siren, victory chime) with mute toggle.
+

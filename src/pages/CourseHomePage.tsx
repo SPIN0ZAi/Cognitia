@@ -10,6 +10,7 @@ import {
   Layers,
   Activity,
   CheckCircle2,
+  Gamepad2,
 } from 'lucide-react';
 import { useStudy } from '../context/StudyContext';
 import { LESSON_1_DATA } from '../data/lesson1Data';
@@ -20,11 +21,12 @@ import {
   StatusLed,
   CoordinateStamp,
 } from '../components/common/InstrumentControls';
+import { AttractModeCanvas } from '../game/components/AttractModeCanvas';
 
 export const CourseHomePage: React.FC<{
   onNavigate: (view: string, lessonId?: string, sectionId?: string) => void;
 }> = ({ onNavigate }) => {
-  const { progress } = useStudy();
+  const { progress, combinedProgress } = useStudy();
   const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA];
 
   // Calculate total completed sections
@@ -75,7 +77,28 @@ export const CourseHomePage: React.FC<{
     }
   };
 
+  const getLastVisitedDetails = () => {
+    if (!progress.lastVisited) return null;
+    const l = lessons.find((item) => item.id === progress.lastVisited?.lessonId);
+    if (!l) return null;
+    let secTitle = 'Active Topic';
+    for (const ch of l.chapters) {
+      const s = ch.sections.find((sec: any) => sec.id === progress.lastVisited?.sectionId);
+      if (s) {
+        secTitle = s.title;
+        break;
+      }
+    }
+    return {
+      lessonName: l.title.split(':')[0],
+      sectionName: secTitle,
+      lessonId: l.id,
+      sectionId: progress.lastVisited.sectionId,
+    };
+  };
+
   const nextStep = getNextRecommendedStep();
+  const lastVisitedDetails = getLastVisitedDetails();
 
   return (
     <div className="page-wrapper" style={{ position: 'relative', zIndex: 2 }}>
@@ -266,6 +289,16 @@ export const CourseHomePage: React.FC<{
           <TactileButton
             variant="secondary"
             size="md"
+            onClick={() => onNavigate('play')}
+            icon={<Gamepad2 size={14} />}
+            cursorLabel="LEARN_AND_PLAY"
+          >
+            Learn &amp; Play Arcade
+          </TactileButton>
+
+          <TactileButton
+            variant="secondary"
+            size="md"
             onClick={() => onNavigate('glossary')}
             icon={<Bookmark size={14} />}
             cursorLabel="AI_GLOSSARY"
@@ -274,6 +307,92 @@ export const CourseHomePage: React.FC<{
           </TactileButton>
         </div>
       </section>
+
+      {/* Prominent Welcome Back Experience */}
+      {lastVisitedDetails && completedSections > 0 ? (
+        <section
+          className="card animate-fade-in"
+          style={{
+            marginBottom: '2rem',
+            padding: '1.25rem 1.5rem',
+            background: 'linear-gradient(90deg, rgba(120, 213, 232, 0.08) 0%, rgba(6, 9, 14, 0.95) 100%)',
+            borderLeft: '4px solid var(--lab-accent-cyan)',
+            borderTop: '1px solid #1c2b3e',
+            borderRight: '1px solid #1c2b3e',
+            borderBottom: '1px solid #1c2b3e',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
+              <span className="badge badge-cyan font-mono">WELCOME BACK</span>
+              <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'var(--font-mono)' }}>
+                OVERALL WEIGHTED PROGRESS: {combinedProgress.totalPercentage}%
+              </span>
+            </div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>
+              Continue: {lastVisitedDetails.lessonName} · <span style={{ color: '#78D5E8' }}>"{lastVisitedDetails.sectionName}"</span>
+            </h3>
+            <div style={{ fontSize: '0.78rem', color: 'var(--lab-text-muted)', marginTop: '0.25rem' }}>
+              Reading: {progressPercent}% · Quizzes: {combinedProgress.quizScore.toFixed(0)}% · Simulators: {combinedProgress.simulatorScore.toFixed(0)}% · Arcade: {combinedProgress.gameScore.toFixed(0)}%
+            </div>
+          </div>
+
+          <TactileButton
+            variant="cyan"
+            size="md"
+            onClick={() => onNavigate('lesson', lastVisitedDetails.lessonId, lastVisitedDetails.sectionId)}
+            cursorLabel="JUMP_SECTION"
+          >
+            Resume Section
+            <ArrowRight size={14} />
+          </TactileButton>
+        </section>
+      ) : (
+        <section
+          className="card animate-fade-in"
+          style={{
+            marginBottom: '2rem',
+            padding: '1.25rem 1.5rem',
+            background: 'linear-gradient(90deg, rgba(198, 242, 119, 0.08) 0%, rgba(6, 9, 14, 0.95) 100%)',
+            borderLeft: '4px solid var(--lab-accent-lime)',
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
+              <span className="badge badge-lime font-mono">INITIAL ENROLLMENT</span>
+              <span style={{ fontSize: '0.72rem', color: '#94A3B8', fontFamily: 'var(--font-mono)' }}>
+                ESII ALBACETE // UCLM
+              </span>
+            </div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#F1F5F9', margin: 0 }}>
+              Welcome to Cognitia Computational Laboratory!
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--lab-text-secondary)', margin: '0.25rem 0 0 0' }}>
+              Begin your master trajectory with Lesson 1: Foundations of Artificial Intelligence &amp; Rational Agents.
+            </p>
+          </div>
+
+          <TactileButton
+            variant="lime"
+            size="md"
+            onClick={() => onNavigate('lesson', 'lesson-1', 'definition-and-misconceptions')}
+            cursorLabel="BEGIN_JOURNEY"
+          >
+            Start Course
+            <ArrowRight size={14} />
+          </TactileButton>
+        </section>
+      )}
 
       {/* Telemetry Dashboard: Next Recommended Mission + Progress Metrics */}
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
@@ -367,6 +486,93 @@ export const CourseHomePage: React.FC<{
           <div style={{ marginTop: '0.75rem', fontSize: '0.72rem', color: 'var(--lab-text-muted)', display: 'flex', justifyContent: 'space-between' }}>
             <span>Target Exam: UCLM Final Assessment</span>
             <span>Total Units: 3 Modules</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Learn & Play Arcade Cabinet Featured Showcase */}
+      <section
+        style={{
+          marginBottom: '3rem',
+          padding: '1.75rem',
+          borderRadius: 'var(--radius-lg)',
+          background: 'linear-gradient(135deg, rgba(8, 14, 24, 0.95) 0%, rgba(4, 7, 13, 0.98) 100%)',
+          border: '1px solid rgba(120, 213, 232, 0.25)',
+          boxShadow: '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 25px rgba(120, 213, 232, 0.1)',
+        }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: '1.75rem', alignItems: 'center' }}>
+          {/* Left Column: Headline and Educational Mechanics */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
+              <span className="badge badge-lime font-mono" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <Gamepad2 size={13} /> LEARN &amp; PLAY
+              </span>
+              <span className="badge badge-cyan font-mono">MAZE-CHASE INSTRUMENT</span>
+            </div>
+
+            <h2
+              className="font-display"
+              style={{
+                fontSize: 'clamp(1.5rem, 3vw, 2rem)',
+                fontWeight: 800,
+                color: '#F1F5F9',
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2,
+                marginBottom: '0.75rem',
+              }}
+            >
+              Learn. Play. Outsmart the algorithm.
+            </h2>
+
+            <p style={{ fontSize: '0.9rem', color: 'var(--lab-text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+              The classic maze-chase reimagined as an interactive graph search laboratory: you are an autonomous cybernetic probe, and the enemies are the course’s real search algorithms hunting you in real time. Watch BFS expand in concentric rings, outrun Greedy in dead-end traps, and witness A* calculate optimal paths with live X-Ray vector radar.
+            </p>
+
+            {/* 5 Algorithm Enemy Badges */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '1.5rem' }}>
+              <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(120, 213, 232, 0.15)', border: '1px solid #78D5E8', color: '#78D5E8', fontFamily: 'var(--font-mono)' }}>
+                The Wave (BFS)
+              </span>
+              <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #F59E0B', color: '#F59E0B', fontFamily: 'var(--font-mono)' }}>
+                The Miser (UCS)
+              </span>
+              <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.15)', border: '1px solid #A855F7', color: '#A855F7', fontFamily: 'var(--font-mono)' }}>
+                The Plunger (DFS)
+              </span>
+              <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(244, 63, 94, 0.15)', border: '1px solid #F43F5E', color: '#F43F5E', fontFamily: 'var(--font-mono)' }}>
+                The Gambler (Greedy)
+              </span>
+              <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.5rem', borderRadius: '4px', background: 'rgba(198, 242, 119, 0.15)', border: '1px solid #C6F277', color: '#C6F277', fontFamily: 'var(--font-mono)' }}>
+                The Strategist (A*)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => onNavigate('play')}
+                className="btn-tactile btn-primary"
+                style={{
+                  padding: '0.65rem 1.5rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  background: '#C6F277',
+                  color: '#06090e',
+                  boxShadow: '0 0 20px rgba(198, 242, 119, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                }}
+              >
+                <Gamepad2 size={18} />
+                PLAY COGNITIA CHASE ▶
+              </button>
+            </div>
+          </div>
+
+          {/* Right Column: Animated Attract Mode Mini Arcade Preview */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <AttractModeCanvas onStartPlay={() => onNavigate('play')} />
           </div>
         </div>
       </section>

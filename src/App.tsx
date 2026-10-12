@@ -14,11 +14,12 @@ import { Lesson3Page } from './pages/Lesson3Page';
 import { PracticePage } from './pages/PracticePage';
 import { GlossaryPage } from './pages/GlossaryPage';
 import { ProgressPage } from './pages/ProgressPage';
+import { PlayPage } from './pages/PlayPage';
 import './styles/components.css';
 import './styles/visualizers.css';
 
 export function AppContent() {
-  const [currentView, setCurrentView] = useState<'home' | 'lesson' | 'practice' | 'glossary' | 'progress'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'lesson' | 'practice' | 'glossary' | 'progress' | 'play'>('home');
   const [currentLessonId, setCurrentLessonId] = useState<'lesson-1' | 'lesson-2' | 'lesson-3'>('lesson-1');
   const [currentSectionId, setCurrentSectionId] = useState<string | undefined>(undefined);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -83,6 +84,7 @@ export function AppContent() {
           {currentView === 'practice' && <PracticePage onNavigate={handleNavigate} />}
           {currentView === 'glossary' && <GlossaryPage onNavigate={handleNavigate} />}
           {currentView === 'progress' && <ProgressPage onNavigate={handleNavigate} />}
+          {currentView === 'play' && <PlayPage onNavigate={handleNavigate} />}
         </main>
 
         <Footer />
