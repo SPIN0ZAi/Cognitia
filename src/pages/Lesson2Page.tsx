@@ -7,6 +7,7 @@ import { RomaniaGraphVisualizer } from '../components/visualizers/RomaniaGraphVi
 import { MissionariesVisualizer } from '../components/visualizers/MissionariesVisualizer';
 import { WaterJugsVisualizer } from '../components/visualizers/WaterJugsVisualizer';
 import { EightQueensVisualizer } from '../components/visualizers/EightQueensVisualizer';
+import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
 
 export const Lesson2Page: React.FC<{ activeSectionId?: string }> = ({ activeSectionId }) => {
   const { progress, markSectionComplete, toggleBookmark, isBookmarked, setLastVisited } = useStudy();
@@ -140,16 +141,7 @@ export const Lesson2Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    fontSize: '0.88rem',
-                    color: 'var(--text-secondary)',
-                    lineHeight: 1.7,
-                    whiteSpace: 'pre-line',
-                  }}
-                >
-                  {sec.content}
-                </div>
+                <MarkdownRenderer content={sec.content} />
 
                 {/* Vacuum World Simulator in Section 2 */}
                 {sec.id === 'vacuum-cleaner-world' && (
