@@ -44,15 +44,9 @@ export const LESSON_2_DATA: LessonData = {
 
 An **agent** is an active entity that perceives its surrounding environment through **sensors** and acts upon that environment through **actuators**.
 
-\`\`\`
-+-------------+      percepts       +-----------------------+
-|             | ------------------> |        SENSORS        |
-|             |                     +-----------------------+
-| ENVIRONMENT |                                 |
-|             |                     +-----------------------+
-|             | <------------------ |       ACTUATORS       |
-+-------------+      actions        +-----------------------+
-\`\`\`
+The fundamental interaction loop between the **environment** and the **agent** operates via two channels:
+- **Percepts ($P^*$)**: flow from the environment into the agent's **sensors**.
+- **Actions ($A$)**: are chosen by the agent's internal program and executed upon the environment through its **actuators**.
 
 Mathematically, the agent's behavior is fully described by the **agent function** $f$:
 
