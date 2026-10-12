@@ -233,3 +233,49 @@ A fusion of:
   2. **Push on Navigation**: Every navigation action (Sidebar, Header, Cards, Search Modal) pushes a typed state entry (`RouteState`) and updates `document.title`.
   3. **Seamless Back/Forward**: `window.addEventListener('popstate')` restores view state, lesson ID, and section scroll target smoothly without leaving the application.
   4. **Root Anchor Protection**: On initial load, a root anchor state is primed. Deep links automatically anchor Home (`/`) underneath them, ensuring that pressing the browser Back button from a deep link or internal screen always navigates back inside Cognitia rather than terminating the session.
+
+---
+
+## 8. AUTHENTIC 1980 ARCADE FIDELITY & HEURISTIC TEACHING BRIDGE
+
+### 8.1 Research & Architectural References
+- **Authoritative Sources**:
+  1. Jamey Pittman, *"The Pac-Man Dossier"* (comprehensive hardware timings, sub-tile tile mechanics, mode tables, and targeting quirks).
+  2. Don Hodges, *"Why did Pinky and Inky turn left when Pac-Man moved up?"* (assembly disassembly of the original Z80 ROM overflow bug).
+  3. Toru Iwatani, Namco design archives on character personality differentiation.
+
+### 8.2 Authentic Mechanical Rules
+1. **The 28×31 Labyrinth**:
+   - 28 columns $\times$ 31 rows with double-walled neon blue geometry.
+   - Exact dot inventory: 240 standard dots + 4 energizers in corners $(1, 3), (26, 3), (1, 23), (26, 23) = 244$ total.
+   - Side tunnels on Row 14 ($y=14$) with wrap-around at $x=0 \leftrightarrow x=27$ and tunnel speed penalty ($40\% - 50\%$).
+   - Ghost House at rows 12–16, cols 10–17 with permeable door at $y=12, x \in \{13, 14\}$.
+   - Forbidden Up-Turn Tiles: Ghosts cannot turn Up at $(12, 11), (15, 11), (12, 23), (15, 23)$.
+
+2. **Ghost Decision Engine**:
+   - Evaluated at tile entry: selects neighbor minimizing Euclidean distance squared $D^2 = (N_x - T_x)^2 + (N_y - T_y)^2$ to target tile.
+   - **No Reverse Rule**: A ghost can never reverse direction ($180^\circ$ turn) except upon mode transitions.
+   - **Tie-Break Order**: Strictly $\text{UP} > \text{LEFT} > \text{DOWN} > \text{RIGHT}$.
+   - **Four Personalities**:
+     - *Blinky (Shadow / Red)*: Chases player's exact tile $(P_x, P_y)$. Accelerates at Cruise Elroy thresholds ($<20$ dots, $<10$ dots).
+     - *Pinky (Speedy / Pink)*: Anticipates 4 tiles ahead in player facing direction. Features the authentic 16-bit UP overflow bug: when facing Up, targets $(P_x - 4, P_y - 4)$.
+     - *Inky (Bashful / Cyan)*: Flanking attack. Doubles the vector from Blinky to the intermediate tile 2 spaces ahead of player: $T = B + 2 \times ((P + 2 \cdot \vec{d}) - B)$.
+     - *Clyde (Pokey / Orange)*: Proximity cowardice. Chases player directly when distance $\ge 8$ tiles; retreats to bottom-left scatter corner $(0, 31)$ when $< 8$ tiles.
+   - **Frightened Mode**: Turn decisions choose random valid non-reverse directions; white flashing sequence in final 2 seconds.
+   - **Eaten Eyes**: Navigates at $200\%$ speed directly to ghost house door $(13.5, 11)$, revives, and re-emerges.
+
+3. **Mode Timing Schedule**:
+   - Level 1: Scatter (7s) $\rightarrow$ Chase (20s) $\rightarrow$ Scatter (7s) $\rightarrow$ Chase (20s) $\rightarrow$ Scatter (5s) $\rightarrow$ Chase (20s) $\rightarrow$ Scatter (5s) $\rightarrow$ Chase (permanent).
+   - Speed Tables: Distinct speed percentages for player, player eating dots (1-frame pause), ghosts, tunnel ghosts, frightened ghosts, and eyes.
+   - Ghost House Release: Staggered release counters (0, 0, 30, 60 dots) + 4-second inactivity release timer.
+   - Fruit Spawns: Spawns at $(13.5, 17)$ after 70 dots and 170 dots eaten (lasts 9.5s).
+
+### 8.3 The Teaching Bridge: Heuristic Evaluation & Greedy Local Search
+- **Classic Mode (Default)**: Plays identically to the 1980 arcade classic.
+- **Algorithm Mode (Toggle)**: Swaps ghost targeting to the course's 5 search algorithms (BFS, UCS, DFS, Greedy, A*) with live X-Ray HUD.
+- **"Why Does It Work?" Academic Insight**:
+  - The classic 1980 arcade targeting rule is shown to be a **greedy 1-step lookahead informed search**:
+    $$h(n) = \sqrt{(n_x - T_x)^2 + (n_y - T_y)^2}$$
+    The ghost evaluates the frontier of adjacent walkable nodes $n \in \text{Neighbors}(s)$ and selects $\arg\min_{n} h(n)$.
+  - Students discover why this greedy local heuristic works well in open mazes but gets tricked by concave obstacles—leading directly into the motivation for global $A^*$ search!
+

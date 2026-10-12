@@ -1,14 +1,20 @@
 /**
- * Cognitia Chase: Maze Agents — Canvas 2D Vector Renderer
+ * Cognitia Chase: Authentic 1980 Arcade Canvas 2D Renderer
  * 
- * High-DPI hardware accelerated 2D vector renderer with
- * Living Laboratory dark graphite aesthetic, phosphor neon glow,
- * distinct geometric silhouettes for colorblind accessibility,
- * and live X-Ray search overlay.
+ * Renders the authentic 28x31 playfield with crisp pixel art:
+ * - Pure black playfield with neon-blue double-walled arcade labyrinth
+ * - Creamy peach pellets and pulsing energizers
+ * - Chomping yellow hero with 3-frame mouth cycle and death animation
+ * - Rounded ghosts with animated wavy skirts and directional pupils
+ * - Blue frightened ghosts with squiggly mouths and white flash cycle
+ * - Eaten floating eyes returning to the ghost house
+ * - Classic arcade HUD (1UP, HIGH SCORE, READY!, lives counter, fruit indicators)
+ * - Optional CRT scanline & phosphor bloom filter
+ * - Live X-Ray overlay in Algorithm Mode
  */
 
 import type { GameEngine } from '../engine/GameEngine';
-import type { GhostEntity } from '../engine/types';
+import type { GhostEntity, Direction } from '../engine/types';
 
 export interface RendererOptions {
   showXRay: boolean;
@@ -36,8 +42,8 @@ export class CanvasRenderer {
     const maze = engine.maze;
 
     const dpr = window.devicePixelRatio || 1;
-    const displayWidth = canvas.clientWidth || 640;
-    const displayHeight = canvas.clientHeight || 480;
+    const displayWidth = canvas.clientWidth || 560;
+    const displayHeight = canvas.clientHeight || 620;
 
     if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
       canvas.width = displayWidth * dpr;
@@ -46,34 +52,39 @@ export class CanvasRenderer {
 
     ctx.save();
     ctx.scale(dpr, dpr);
+    ctx.imageSmoothingEnabled = false;
 
-    // Calculate tile size and centering offset
-    const tileSize = Math.min(
-      (displayWidth - 20) / maze.width,
-      (displayHeight - 20) / maze.height
-    );
-    const offsetX = (displayWidth - maze.width * tileSize) / 2;
-    const offsetY = (displayHeight - maze.height * tileSize) / 2;
-
-    // Clear background
-    ctx.fillStyle = '#06090e';
+    // Pitch-black arcade playfield
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, displayWidth, displayHeight);
 
-    // 1. Draw subtle background laboratory grid
-    this.drawLabGrid(ctx, displayWidth, displayHeight);
+    // 28 columns x 36 rows total aspect ratio (including HUD rows)
+    const hudTopRows = 2.5;
+    const hudBottomRows = 2.5;
+    const totalVirtualRows = maze.height + hudTopRows + hudBottomRows;
 
-    // 2. Translate to maze coordinates
+    const tileSize = Math.floor(
+      Math.min(displayWidth / maze.width, displayHeight / totalVirtualRows)
+    );
+
+    const playfieldWidth = maze.width * tileSize;
+    const playfieldHeight = maze.height * tileSize;
+    const offsetX = Math.floor((displayWidth - playfieldWidth) / 2);
+    const offsetY = Math.floor(hudTopRows * tileSize);
+
+    // 1. Draw Top HUD (1UP, HIGH SCORE)
+    this.renderTopHud(ctx, engine, offsetX, playfieldWidth, tileSize);
+
+    // 2. Draw Maze Playfield
     ctx.save();
     ctx.translate(offsetX, offsetY);
 
-    // 3. Render Maze Terrain (Walls, Mud, Ice)
-    this.renderTerrain(ctx, maze, tileSize);
-
-    // 4. Render Pellets & Power Nodes
+    this.renderMazeWalls(ctx, maze, tileSize);
     this.renderPellets(ctx, maze, tileSize);
+    this.renderFruit(ctx, engine, tileSize);
 
-    // 5. Render X-Ray Search Overlay (if active)
-    if (options.showXRay) {
+    // 3. Render X-Ray search overlay if in Algorithm Mode
+    if (options.showXRay && engine.targetingMode === 'algorithm') {
       const focalGhost =
         engine.ghosts.find((g: GhostEntity) => g.personality === options.xRayGhostPersonality) ||
         engine.ghosts[0];
@@ -82,138 +93,417 @@ export class CanvasRenderer {
       }
     }
 
-    // 6. Render Player Agent
+    // 4. Render Player & Ghosts
     this.renderPlayer(ctx, engine, tileSize);
+    this.renderGhosts(ctx, engine, tileSize);
 
-    // 7. Render Ghosts
-    for (const ghost of engine.ghosts) {
-      this.renderGhost(ctx, ghost, tileSize);
-    }
+    // 5. Draw READY! or GAME OVER alerts in center
+    this.renderCenterAlerts(ctx, engine, tileSize);
 
-    ctx.restore(); // Restore maze translation
+    ctx.restore();
 
-    // 8. CRT Scanlines & Phosphor Post-processing (if enabled)
+    // 6. Draw Bottom HUD (Lives & Level Fruit)
+    this.renderBottomHud(
+      ctx,
+      engine,
+      offsetX,
+      offsetY + playfieldHeight,
+      playfieldWidth,
+      tileSize
+    );
+
+    // 7. Optional CRT Scanlines
     if (options.enableScanlines) {
       this.renderScanlines(ctx, displayWidth, displayHeight);
     }
 
-    ctx.restore(); // Restore DPR scale
+    ctx.restore();
   }
 
-  private drawLabGrid(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    ctx.strokeStyle = 'rgba(120, 213, 232, 0.03)';
-    ctx.lineWidth = 1;
-    const step = 24;
-    ctx.beginPath();
-    for (let x = 0; x < w; x += step) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-    }
-    for (let y = 0; y < h; y += step) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-    }
-    ctx.stroke();
+  private renderTopHud(
+    ctx: CanvasRenderingContext2D,
+    engine: GameEngine,
+    offsetX: number,
+    width: number,
+    tileSize: number
+  ): void {
+    ctx.save();
+    ctx.font = `bold ${Math.max(10, Math.floor(tileSize * 0.9))}px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'left';
+
+    // 1UP
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('1UP', offsetX + tileSize * 1, tileSize * 1.2);
+    ctx.fillStyle = '#ffff00';
+    ctx.fillText(`${engine.score.toString().padStart(2, ' ')}`, offsetX + tileSize * 1, tileSize * 2.2);
+
+    // HIGH SCORE
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('HIGH SCORE', offsetX + width / 2, tileSize * 1.2);
+    ctx.fillStyle = '#ffff00';
+    ctx.fillText(
+      `${Math.max(engine.score, engine.highScore).toString().padStart(2, ' ')}`,
+      offsetX + width / 2,
+      tileSize * 2.2
+    );
+
+    ctx.restore();
   }
 
-  private renderTerrain(ctx: CanvasRenderingContext2D, maze: any, tileSize: number): void {
+  private renderBottomHud(
+    ctx: CanvasRenderingContext2D,
+    engine: GameEngine,
+    offsetX: number,
+    bottomY: number,
+    width: number,
+    tileSize: number
+  ): void {
+    ctx.save();
+    const iconR = tileSize * 0.45;
+    const iconY = bottomY + tileSize * 1.2;
+
+    // Remaining lives (yellow pac-man icons)
+    ctx.fillStyle = '#ffff00';
+    for (let i = 0; i < Math.max(0, engine.player.lives - 1); i++) {
+      const iconX = offsetX + tileSize * (1.5 + i * 1.6);
+      ctx.beginPath();
+      ctx.arc(iconX, iconY, iconR, 0.25 * Math.PI, 1.75 * Math.PI);
+      ctx.lineTo(iconX, iconY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Fruit level indicators at bottom right
+    const fruitX = offsetX + width - tileSize * 2;
+    this.drawFruitIcon(ctx, fruitX, iconY, tileSize * 0.8, engine.fruit.type);
+
+    ctx.restore();
+  }
+
+  private renderMazeWalls(ctx: CanvasRenderingContext2D, maze: any, tileSize: number): void {
+    ctx.save();
+
     for (let y = 0; y < maze.height; y++) {
       for (let x = 0; x < maze.width; x++) {
         const tile = maze.getTile(x, y);
-        const px = x * tileSize;
-        const py = y * tileSize;
 
         if (tile === 'wall') {
-          // Dark circuit wall block
-          ctx.fillStyle = '#0b1320';
-          ctx.fillRect(px, py, tileSize, tileSize);
+          const px = x * tileSize;
+          const py = y * tileSize;
 
-          ctx.strokeStyle = '#1e293b';
-          ctx.lineWidth = 1;
+          // Double neon-blue arcade wall effect
+          ctx.strokeStyle = '#2121ff';
+          ctx.lineWidth = Math.max(2, Math.floor(tileSize * 0.16));
           ctx.strokeRect(px + 0.5, py + 0.5, tileSize - 1, tileSize - 1);
 
-          // Neon circuit trace highlight on perimeter
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(px + 2, py + 2, tileSize - 4, tileSize - 4);
+          ctx.fillStyle = '#0a0a33';
+          ctx.fillRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
+        } else if (tile === 'door') {
+          // Ghost house door: pink horizontal bar
+          const px = x * tileSize;
+          const py = y * tileSize + tileSize / 2 - 2;
+          ctx.fillStyle = '#ffb8ae';
+          ctx.fillRect(px, py, tileSize, 4);
         } else if (tile === 'mud') {
-          // High-friction mud corridor (Cost = 3.0)
-          ctx.fillStyle = 'rgba(245, 158, 11, 0.12)';
-          ctx.fillRect(px, py, tileSize, tileSize);
-
-          ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
-
-          // Cautionary hatch lines
-          ctx.strokeStyle = 'rgba(245, 158, 11, 0.2)';
-          ctx.beginPath();
-          ctx.moveTo(px + 2, py + tileSize - 2);
-          ctx.lineTo(px + tileSize - 2, py + 2);
-          ctx.stroke();
-
-          // Cost indicator tag
-          ctx.fillStyle = 'rgba(245, 158, 11, 0.5)';
-          ctx.font = `${Math.max(7, Math.floor(tileSize * 0.35))}px monospace`;
-          ctx.textAlign = 'center';
-          ctx.fillText('3x', px + tileSize / 2, py + tileSize / 2 + 3);
+          ctx.fillStyle = 'rgba(120, 70, 30, 0.45)';
+          ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
         } else if (tile === 'ice') {
-          // Low-friction superconductor ice track (Cost = 0.5)
-          ctx.fillStyle = 'rgba(120, 213, 232, 0.15)';
-          ctx.fillRect(px, py, tileSize, tileSize);
-
-          ctx.strokeStyle = 'rgba(120, 213, 232, 0.4)';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(px + 1, py + 1, tileSize - 2, tileSize - 2);
-
-          ctx.fillStyle = 'rgba(120, 213, 232, 0.6)';
-          ctx.font = `${Math.max(6, Math.floor(tileSize * 0.32))}px monospace`;
-          ctx.textAlign = 'center';
-          ctx.fillText('.5x', px + tileSize / 2, py + tileSize / 2 + 3);
+          ctx.fillStyle = 'rgba(0, 240, 255, 0.25)';
+          ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
         }
       }
     }
+
+    ctx.restore();
   }
 
   private renderPellets(ctx: CanvasRenderingContext2D, maze: any, tileSize: number): void {
-    const pulse = Math.sin(this.animFrameTime * 4) * 0.2 + 0.8;
+    ctx.save();
+    const now = this.animFrameTime;
 
     for (let y = 0; y < maze.height; y++) {
       for (let x = 0; x < maze.width; x++) {
-        const tile = maze.getTile(x, y);
+        const tile = maze.grid[y]?.[x];
         const cx = x * tileSize + tileSize / 2;
         const cy = y * tileSize + tileSize / 2;
 
         if (tile === 'pellet') {
-          // Glowing data point
-          ctx.fillStyle = '#78D5E8';
-          ctx.beginPath();
-          ctx.arc(cx, cy, Math.max(2, tileSize * 0.12), 0, Math.PI * 2);
-          ctx.fill();
+          // Classic creamy peach square dot
+          ctx.fillStyle = '#ffb897';
+          const dotSize = Math.max(3, Math.floor(tileSize * 0.22));
+          ctx.fillRect(cx - dotSize / 2, cy - dotSize / 2, dotSize, dotSize);
         } else if (tile === 'power') {
-          // Pulsing super power node
-          const r = Math.max(4, tileSize * 0.28) * pulse;
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(this.animFrameTime * 2);
-
-          ctx.fillStyle = '#C6F277';
-          ctx.shadowColor = '#C6F277';
-          ctx.shadowBlur = 8;
-
-          // Diamond shape
+          // Pulsing energizer disc (flashes at ~5Hz)
+          const pulse = (Math.sin(now * 10) + 1) / 2;
+          const r = tileSize * (0.35 + 0.08 * pulse);
+          ctx.fillStyle = '#ffb897';
           ctx.beginPath();
-          ctx.moveTo(0, -r);
-          ctx.lineTo(r, 0);
-          ctx.lineTo(0, r);
-          ctx.lineTo(-r, 0);
-          ctx.closePath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
           ctx.fill();
-
-          ctx.restore();
         }
       }
     }
+
+    ctx.restore();
+  }
+
+  private renderFruit(ctx: CanvasRenderingContext2D, engine: GameEngine, tileSize: number): void {
+    if (!engine.fruit.active) return;
+    const fx = engine.fruit.tile.x * tileSize + tileSize / 2;
+    const fy = engine.fruit.tile.y * tileSize + tileSize / 2;
+    this.drawFruitIcon(ctx, fx, fy, tileSize * 0.9, engine.fruit.type);
+  }
+
+  private drawFruitIcon(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    size: number,
+    type: string
+  ): void {
+    ctx.save();
+    const r = size * 0.4;
+
+    if (type === 'cherry') {
+      // Two red cherries with brown stem
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath();
+      ctx.arc(cx - r * 0.5, cy + r * 0.2, r * 0.55, 0, Math.PI * 2);
+      ctx.arc(cx + r * 0.4, cy + r * 0.4, r * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#8b5a2b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - r * 0.5, cy + r * 0.1);
+      ctx.lineTo(cx, cy - r * 0.7);
+      ctx.lineTo(cx + r * 0.4, cy + r * 0.3);
+      ctx.stroke();
+    } else {
+      // Strawberry or Peach
+      ctx.fillStyle = '#ff3366';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#00ff66';
+      ctx.fillRect(cx - 2, cy - r * 0.9, 4, 4);
+    }
+
+    ctx.restore();
+  }
+
+  private renderPlayer(ctx: CanvasRenderingContext2D, engine: GameEngine, tileSize: number): void {
+    const p = engine.player;
+    const cx = p.x * tileSize + tileSize / 2;
+    const cy = p.y * tileSize + tileSize / 2;
+    const r = tileSize * 0.48;
+
+    ctx.save();
+
+    // Death spin sequence
+    if (engine.state === 'player_caught') {
+      const deathProgress = 1.0 - Math.max(0, p.invulnerableTimer);
+      const angleOpen = Math.min(Math.PI * 0.99, deathProgress * Math.PI);
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI / 2 + angleOpen, -Math.PI / 2 - angleOpen + Math.PI * 2);
+      ctx.lineTo(cx, cy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    // Chomping mouth animation cycle (closed -> mid -> wide)
+    const chompPhase = Math.sin(this.animFrameTime * 20);
+    const mouthAngle = p.dir === 'none' ? 0.05 : Math.abs(chompPhase) * 0.35 * Math.PI;
+
+    // Rotation angle based on facing direction
+    let baseAngle = 0;
+    if (p.dir === 'right') baseAngle = 0;
+    else if (p.dir === 'down') baseAngle = Math.PI * 0.5;
+    else if (p.dir === 'left') baseAngle = Math.PI;
+    else if (p.dir === 'up') baseAngle = Math.PI * 1.5;
+
+    ctx.fillStyle = '#ffff00';
+    ctx.beginPath();
+    ctx.arc(
+      cx,
+      cy,
+      r,
+      baseAngle + mouthAngle,
+      baseAngle + (Math.PI * 2 - mouthAngle)
+    );
+    ctx.lineTo(cx, cy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  private renderGhosts(ctx: CanvasRenderingContext2D, engine: GameEngine, tileSize: number): void {
+    const now = this.animFrameTime;
+
+    for (const ghost of engine.ghosts) {
+      const gx = ghost.x * tileSize + tileSize / 2;
+      const gy = ghost.y * tileSize + tileSize / 2;
+      const r = tileSize * 0.46;
+
+      ctx.save();
+
+      if (ghost.mode === 'eaten') {
+        // Eaten mode: render only the floating white eyes & pupils
+        this.drawGhostEyes(ctx, gx, gy, r, ghost.dir);
+      } else if (ghost.mode === 'frightened') {
+        // Frightened mode: deep navy blue, flashing white in last 2 seconds
+        let bodyColor = '#2121ff';
+        let faceColor = '#ffb8ff';
+
+        if (ghost.frightenedTimer < 2.0) {
+          const flash = Math.floor(now * 8) % 2 === 0;
+          if (flash) {
+            bodyColor = '#ffffff';
+            faceColor = '#ff0000';
+          }
+        }
+
+        this.drawGhostBody(ctx, gx, gy, r, bodyColor);
+        this.drawFrightenedFace(ctx, gx, gy, r, faceColor);
+      } else {
+        // Normal mode: personality color + directional eyes
+        this.drawGhostBody(ctx, gx, gy, r, ghost.color);
+        this.drawGhostEyes(ctx, gx, gy, r, ghost.dir);
+      }
+
+      ctx.restore();
+    }
+  }
+
+  private drawGhostBody(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    r: number,
+    color: string
+  ): void {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+
+    // Dome head
+    ctx.arc(cx, cy - r * 0.1, r, Math.PI, 0, false);
+
+    // Straight sides down
+    const bottomY = cy + r;
+    ctx.lineTo(cx + r, bottomY);
+
+    // 2-frame oscillating wavy skirt
+    const waveOffset = Math.sin(this.animFrameTime * 14) * (r * 0.2);
+    const skirtWidth = r * 2;
+    const waveCount = 3;
+    const step = skirtWidth / waveCount;
+
+    for (let i = waveCount; i > 0; i--) {
+      const peakX = cx - r + (i - 0.5) * step;
+      const peakY = bottomY - r * 0.35 + (i % 2 === 0 ? waveOffset : -waveOffset);
+      const endX = cx - r + (i - 1) * step;
+      ctx.quadraticCurveTo(peakX, peakY, endX, bottomY);
+    }
+
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  private drawGhostEyes(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    r: number,
+    dir: Direction
+  ): void {
+    // Pupil offsets based on travel direction
+    let ox = 0;
+    let oy = 0;
+    if (dir === 'left') ox = -r * 0.22;
+    else if (dir === 'right') ox = r * 0.22;
+    else if (dir === 'up') oy = -r * 0.25;
+    else if (dir === 'down') oy = r * 0.25;
+
+    // White eye ovals
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.36 + ox * 0.5, cy - r * 0.2 + oy * 0.5, r * 0.3, r * 0.38, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + r * 0.36 + ox * 0.5, cy - r * 0.2 + oy * 0.5, r * 0.3, r * 0.38, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dark blue pupils
+    ctx.fillStyle = '#2121ff';
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.36 + ox, cy - r * 0.2 + oy, r * 0.16, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.36 + ox, cy - r * 0.2 + oy, r * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawFrightenedFace(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    r: number,
+    faceColor: string
+  ): void {
+    // Small dots for eyes
+    ctx.fillStyle = faceColor;
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.3, cy - r * 0.15, r * 0.14, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.3, cy - r * 0.15, r * 0.14, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wavy squiggly mouth
+    ctx.strokeStyle = faceColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - r * 0.5, cy + r * 0.35);
+    ctx.lineTo(cx - r * 0.25, cy + r * 0.2);
+    ctx.lineTo(cx, cy + r * 0.35);
+    ctx.lineTo(cx + r * 0.25, cy + r * 0.2);
+    ctx.lineTo(cx + r * 0.5, cy + r * 0.35);
+    ctx.stroke();
+  }
+
+  private renderCenterAlerts(
+    ctx: CanvasRenderingContext2D,
+    engine: GameEngine,
+    tileSize: number
+  ): void {
+    ctx.save();
+    ctx.font = `bold ${Math.floor(tileSize * 1.1)}px "JetBrains Mono", monospace`;
+    ctx.textAlign = 'center';
+
+    const cx = (engine.maze.width * tileSize) / 2;
+    const cy = 17.5 * tileSize;
+
+    if (engine.state === 'ready') {
+      ctx.fillStyle = '#ffff00';
+      ctx.fillText('READY!', cx, cy);
+    } else if (engine.state === 'game_over') {
+      ctx.fillStyle = '#ff0000';
+      ctx.fillText('GAME OVER', cx, cy);
+    }
+
+    ctx.restore();
+  }
+
+  private renderScanlines(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number
+  ): void {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    for (let y = 0; y < height; y += 4) {
+      ctx.fillRect(0, y, width, 1.5);
+    }
+    ctx.restore();
   }
 
   private renderXRayOverlay(
@@ -221,239 +511,32 @@ export class CanvasRenderer {
     ghost: GhostEntity,
     tileSize: number
   ): void {
-    const color = ghost.color;
+    ctx.save();
 
-    // 1. Draw Explored Nodes (Soft footprint glow)
-    ctx.fillStyle = `${color}1A`; // ~10% opacity
-    for (const tile of ghost.telemetry.exploredTiles) {
-      ctx.fillRect(tile.x * tileSize + 1, tile.y * tileSize + 1, tileSize - 2, tileSize - 2);
-    }
+    // Target reticle
+    const tx = ghost.targetTile.x * tileSize + tileSize / 2;
+    const ty = ghost.targetTile.y * tileSize + tileSize / 2;
 
-    // 2. Draw Frontier Nodes (Pulsing radar points)
-    const frontierPulse = Math.sin(this.animFrameTime * 6) * 0.3 + 0.7;
-    ctx.fillStyle = color;
-    for (const f of ghost.telemetry.frontierTiles) {
-      const cx = f.x * tileSize + tileSize / 2;
-      const cy = f.y * tileSize + tileSize / 2;
+    ctx.strokeStyle = '#ffff00';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(tx, ty, tileSize * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Trajectory polyline
+    if (ghost.path.length > 1) {
+      ctx.strokeStyle = ghost.color;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([4, 4]);
       ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(2, tileSize * 0.16) * frontierPulse, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 3. Draw Planned Path (Vector laser beam)
-    if (ghost.path && ghost.path.length > 1) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(2, tileSize * 0.15);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 6;
-
-      ctx.beginPath();
-      const startPx = ghost.x * tileSize + tileSize / 2;
-      const startPy = ghost.y * tileSize + tileSize / 2;
-      ctx.moveTo(startPx, startPy);
-
+      ctx.moveTo(ghost.x * tileSize + tileSize / 2, ghost.y * tileSize + tileSize / 2);
       for (let i = 1; i < ghost.path.length; i++) {
-        const pt = ghost.path[i];
-        ctx.lineTo(pt.x * tileSize + tileSize / 2, pt.y * tileSize + tileSize / 2);
+        ctx.lineTo(ghost.path[i].x * tileSize + tileSize / 2, ghost.path[i].y * tileSize + tileSize / 2);
       }
       ctx.stroke();
-
-      ctx.shadowBlur = 0; // Reset shadow
+      ctx.setLineDash([]);
     }
-
-    // 4. Target reticle
-    const tgt = ghost.telemetry.targetTile;
-    const tx = tgt.x * tileSize + tileSize / 2;
-    const ty = tgt.y * tileSize + tileSize / 2;
-    const reticleR = tileSize * 0.45;
-
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(tx, ty, reticleR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(tx - reticleR - 3, ty);
-    ctx.lineTo(tx + reticleR + 3, ty);
-    ctx.moveTo(tx, ty - reticleR - 3);
-    ctx.lineTo(tx, ty + reticleR + 3);
-    ctx.stroke();
-  }
-
-  private renderPlayer(ctx: CanvasRenderingContext2D, engine: GameEngine, tileSize: number): void {
-    const p = engine.player;
-    const cx = p.x * tileSize + tileSize / 2;
-    const cy = p.y * tileSize + tileSize / 2;
-    const r = tileSize * 0.4;
-
-    // Invulnerability flashing
-    if (p.invulnerableTimer > 0 && Math.floor(this.animFrameTime * 12) % 2 === 0) {
-      return;
-    }
-
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    // Directional rotation
-    let angle = 0;
-    if (p.dir === 'right') angle = 0;
-    else if (p.dir === 'down') angle = Math.PI / 2;
-    else if (p.dir === 'left') angle = Math.PI;
-    else if (p.dir === 'up') angle = -Math.PI / 2;
-    ctx.rotate(angle);
-
-    // Outer radar ring
-    ctx.strokeStyle = 'rgba(120, 213, 232, 0.4)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Cybernetic probe body (Autonomous Agent)
-    const mouthAngle = (Math.sin(this.animFrameTime * 14) * 0.2 + 0.25) * Math.PI;
-    ctx.fillStyle = '#78D5E8';
-    ctx.shadowColor = '#78D5E8';
-    ctx.shadowBlur = 8;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, r, mouthAngle, Math.PI * 2 - mouthAngle);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
-    ctx.fill();
-
-    // Inner core sensor eye
-    ctx.fillStyle = '#06090e';
-    ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.arc(r * 0.2, -r * 0.4, r * 0.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#C6F277';
-    ctx.beginPath();
-    ctx.arc(r * 0.25, -r * 0.4, r * 0.1, 0, Math.PI * 2);
-    ctx.fill();
 
     ctx.restore();
-  }
-
-  private renderGhost(ctx: CanvasRenderingContext2D, ghost: GhostEntity, tileSize: number): void {
-    const cx = ghost.x * tileSize + tileSize / 2;
-    const cy = ghost.y * tileSize + tileSize / 2;
-    const r = tileSize * 0.42;
-
-    ctx.save();
-    ctx.translate(cx, cy);
-
-    // Frightened appearance: flashing cobalt blue / warning white
-    let ghostColor = ghost.color;
-    if (ghost.mode === 'frightened') {
-      const isEnding = ghost.frightenedTimer < 2.5;
-      if (isEnding && Math.floor(this.animFrameTime * 8) % 2 === 0) {
-        ghostColor = '#F1F5F9';
-      } else {
-        ghostColor = '#3B82F6';
-      }
-    }
-
-    ctx.fillStyle = ghostColor;
-    ctx.shadowColor = ghostColor;
-    ctx.shadowBlur = 8;
-
-    // Distinct geometric silhouettes for colorblind accessibility:
-    switch (ghost.personality) {
-      case 'bfs': // The Wave: Concentric Diamond Wave
-        ctx.beginPath();
-        ctx.moveTo(0, -r);
-        ctx.lineTo(r, 0);
-        ctx.lineTo(0, r);
-        ctx.lineTo(-r, 0);
-        ctx.closePath();
-        ctx.fill();
-        break;
-
-      case 'ucs': // The Miser: Hexagon
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const a = (i * Math.PI) / 3;
-          const hx = Math.cos(a) * r;
-          const hy = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(hx, hy);
-          else ctx.lineTo(hx, hy);
-        }
-        ctx.closePath();
-        ctx.fill();
-        break;
-
-      case 'dfs': // The Plunger: Inverted Triangle / Down Arrow
-        ctx.beginPath();
-        ctx.moveTo(-r, -r * 0.8);
-        ctx.lineTo(r, -r * 0.8);
-        ctx.lineTo(0, r);
-        ctx.closePath();
-        ctx.fill();
-        break;
-
-      case 'greedy': // The Gambler: 4-Point Jagged Star
-        ctx.beginPath();
-        for (let i = 0; i < 8; i++) {
-          const a = (i * Math.PI) / 4;
-          const rad = i % 2 === 0 ? r : r * 0.45;
-          const sx = Math.cos(a) * rad;
-          const sy = Math.sin(a) * rad;
-          if (i === 0) ctx.moveTo(sx, sy);
-          else ctx.lineTo(sx, sy);
-        }
-        ctx.closePath();
-        ctx.fill();
-        break;
-
-      case 'astar': // The Strategist: Pentagon
-      default:
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-          const a = (i * 2 * Math.PI) / 5 - Math.PI / 2;
-          const px = Math.cos(a) * r;
-          const py = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
-        break;
-    }
-
-    // Ghost Sensor Eyes
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#06090e';
-    ctx.beginPath();
-    ctx.arc(-r * 0.3, -r * 0.1, r * 0.22, 0, Math.PI * 2);
-    ctx.arc(r * 0.3, -r * 0.1, r * 0.22, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Pupils looking in movement direction
-    let pupX = 0;
-    let pupY = 0;
-    if (ghost.dir === 'left') pupX = -r * 0.08;
-    if (ghost.dir === 'right') pupX = r * 0.08;
-    if (ghost.dir === 'up') pupY = -r * 0.08;
-    if (ghost.dir === 'down') pupY = r * 0.08;
-
-    ctx.fillStyle = ghost.mode === 'frightened' ? '#F43F5E' : '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(-r * 0.3 + pupX, -r * 0.1 + pupY, r * 0.1, 0, Math.PI * 2);
-    ctx.arc(r * 0.3 + pupX, -r * 0.1 + pupY, r * 0.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  private renderScanlines(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
-    for (let y = 0; y < h; y += 4) {
-      ctx.fillRect(0, y, w, 1.5);
-    }
   }
 }
