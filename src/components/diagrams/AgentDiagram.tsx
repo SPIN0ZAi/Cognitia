@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Zap, Cpu, Globe, Play } from 'lucide-react';
+import { Eye, Zap, Cpu, Globe, Play, Car, Paintbrush } from 'lucide-react';
 
 interface ComponentDetail {
   title: string;
@@ -423,7 +423,7 @@ export const AgentDiagram: React.FC = () => {
         >
           <div>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase' }}>
-              🚖 Automated Taxi Example (Slide 7):
+              <Car size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> Automated Taxi Example (Slide 7):
             </span>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
               {currentDetail.examples.taxi}
@@ -432,7 +432,7 @@ export const AgentDiagram: React.FC = () => {
 
           <div>
             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#34d399', textTransform: 'uppercase' }}>
-              🧹 Vacuum-Cleaner World Example (Slide 6):
+              <Paintbrush size={13} style={{ display: "inline", verticalAlign: "middle", marginRight: "0.2rem" }} /> Vacuum-Cleaner World Example (Slide 6):
             </span>
             <div style={{ fontSize: '0.82rem', color: 'var(--text-primary)', marginTop: '0.2rem' }}>
               {currentDetail.examples.vacuum}

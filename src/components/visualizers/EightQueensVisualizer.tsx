@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RotateCcw, Sparkles, CheckCircle } from 'lucide-react';
+import { RotateCcw, Sparkles, CheckCircle, X, Crown } from 'lucide-react';
 
 // Generates all 92 valid 8-queens solutions using backtracking
 const generateAllSolutions = (): number[][] => {
@@ -143,7 +143,7 @@ export const EightQueensVisualizer: React.FC = () => {
                       onClick={() => handleCellClick(r, c)}
                       className={`chess-cell ${isDark ? 'dark' : 'light'} ${inConflict ? 'conflict' : ''}`}
                     >
-                      {hasQueen ? (inConflict ? '❌' : '👑') : ''}
+                      {hasQueen ? (inConflict ? <X size={20} strokeWidth={3} color="#f87171" /> : <Crown size={20} strokeWidth={2} color="#fbbf24" />) : null}
                     </div>
                   );
                 })

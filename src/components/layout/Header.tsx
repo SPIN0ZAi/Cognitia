@@ -18,10 +18,9 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
       <div className="header-brand">
         <button
           onClick={onToggleSidebar}
-          className="btn-tactile btn-sm"
-          style={{ display: 'none' }}
+          className="btn-tactile btn-sm mobile-menu-toggle"
           id="mobile-menu-btn"
-          aria-label="Toggle Navigation"
+          aria-label="Toggle Navigation Menu"
         >
           <Menu size={16} />
         </button>
@@ -37,7 +36,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
             <span className="brand-title" style={{ fontFamily: 'var(--font-display)', letterSpacing: '-0.02em', fontSize: '1.1rem' }}>
               Cognitia
             </span>
-            <span style={{ fontSize: '0.74rem', fontFamily: 'var(--font-mono)', color: 'var(--lab-accent-lime)', marginLeft: '0.5rem', fontWeight: 600 }}>
+            <span className="brand-subtag" style={{ fontSize: '0.74rem', fontFamily: 'var(--font-mono)', color: 'var(--lab-accent-lime)', marginLeft: '0.5rem', fontWeight: 600 }}>
               LAB://2026.UCLM
             </span>
           </div>
@@ -52,7 +51,8 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
           title="Search Course Content (Ctrl + K)"
         >
           <Search size={14} />
-          <span>Search topics, theorems...</span>
+          <span className="search-text-full">Search topics, theorems...</span>
+          <span className="search-text-short">Search</span>
           <span className="kbd-shortcut">⌘K</span>
         </button>
 
@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
           data-cursor-label="AUDIO_SWITCH"
         >
           {audioFeedback ? <Volume2 size={13} className="text-cyan-400" /> : <VolumeX size={13} />}
-          <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>{audioFeedback ? 'SFX ON' : 'SFX'}</span>
+          <span className="header-btn-label" style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>{audioFeedback ? 'SFX ON' : 'SFX'}</span>
         </button>
 
         {/* Calm Mode Switch (Low-Motion & Static Background) */}
@@ -75,7 +75,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
           data-cursor-label="CALM_MODE"
         >
           {calmMode ? <Eye size={13} className="text-amber-400" /> : <Sparkles size={13} className="text-lime-400" />}
-          <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>{calmMode ? 'CALM' : 'LIVING'}</span>
+          <span className="header-btn-label" style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)' }}>{calmMode ? 'CALM' : 'LIVING'}</span>
         </button>
 
         {/* Bookmarks Quick Link */}
@@ -99,9 +99,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleSidebar, onNavigate }) =
               )
             }
             className="btn-tactile btn-primary btn-sm"
+            title="Resume Last Visited Section"
           >
             <BookOpen size={13} />
-            <span>Resume</span>
+            <span className="header-btn-label">Resume</span>
           </button>
         )}
       </div>

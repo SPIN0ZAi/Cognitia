@@ -263,6 +263,7 @@ export const VacuumWorldSimulator: React.FC = () => {
         <div
           style={{
             display: 'flex',
+            flexWrap: 'wrap',
             gap: '0.5rem',
             marginBottom: '1.25rem',
             padding: '0.4rem',
@@ -277,7 +278,7 @@ export const VacuumWorldSimulator: React.FC = () => {
               setIsRunning(false);
             }}
             className={`btn-tactile btn-sm ${mode === 'reflex' ? 'btn-primary' : ''}`}
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 180px' }}
           >
             Reflex Agent Mode (Slide 6)
           </button>
@@ -287,7 +288,7 @@ export const VacuumWorldSimulator: React.FC = () => {
               setIsRunning(false);
             }}
             className={`btn-tactile btn-sm ${mode === 'manual' ? 'btn-primary' : ''}`}
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 180px' }}
           >
             Manual Actions Mode
           </button>
@@ -299,14 +300,14 @@ export const VacuumWorldSimulator: React.FC = () => {
               setBlindStepIndex(0);
             }}
             className={`btn-tactile btn-sm ${mode === 'belief' ? 'btn-amber' : ''}`}
-            style={{ flex: 1 }}
+            style={{ flex: '1 1 180px' }}
           >
             Unknown Initial State / Belief States (Slide 12)
           </button>
         </div>
 
         {/* Dual Layout: Physical Grid + 8-State Space Transition Graph */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '1.5rem' }}>
           {/* Left Column: Physical Environment & Controls */}
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.5rem', color: '#f8fafc' }}>
@@ -329,7 +330,7 @@ export const VacuumWorldSimulator: React.FC = () => {
 
                 <div style={{ margin: '1rem 0', minHeight: '50px', display: 'flex', alignItems: 'center' }}>
                   {robotLocation === 'A' ? (
-                    <div style={{ fontSize: '2.5rem' }}>🤖</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="8.5" cy="15.5" r="1.5" fill="#38bdf8" /><circle cx="15.5" cy="15.5" r="1.5" fill="#38bdf8" /><path d="M12 2v4" /><circle cx="12" cy="7" r="2" /><path d="M2 15h1M21 15h1" /></svg></div>
                   ) : (
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Empty</div>
                   )}
@@ -355,7 +356,7 @@ export const VacuumWorldSimulator: React.FC = () => {
 
                 <div style={{ margin: '1rem 0', minHeight: '50px', display: 'flex', alignItems: 'center' }}>
                   {robotLocation === 'B' ? (
-                    <div style={{ fontSize: '2.5rem' }}>🤖</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="8.5" cy="15.5" r="1.5" fill="#38bdf8" /><circle cx="15.5" cy="15.5" r="1.5" fill="#38bdf8" /><path d="M12 2v4" /><circle cx="12" cy="7" r="2" /><path d="M2 15h1M21 15h1" /></svg></div>
                   ) : (
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Empty</div>
                   )}
@@ -563,7 +564,7 @@ export const VacuumWorldSimulator: React.FC = () => {
 
                       {/* State number label */}
                       <text x="8" y="15" fill={s.isGoal ? '#34d399' : '#94a3b8'} fontSize="10" fontWeight="700">
-                        #{s.id} {s.isGoal ? '★' : ''}
+                        #{s.id} {s.isGoal ? '(G)' : ''}
                       </text>
 
                       {/* 2-room mini board */}
@@ -572,10 +573,16 @@ export const VacuumWorldSimulator: React.FC = () => {
 
                       {/* Robot location marker */}
                       {s.loc === 'A' && (
-                        <text x="21" y="39" textAnchor="middle" fontSize="12">🤖</text>
+                        <g>
+                          <circle cx="21" cy="35" r="5" fill="#38bdf8" opacity="0.8" />
+                          <rect x="18" y="32" width="6" height="3" rx="1" fill="#0f172a" />
+                        </g>
                       )}
                       {s.loc === 'B' && (
-                        <text x="49" y="39" textAnchor="middle" fontSize="12">🤖</text>
+                        <g>
+                          <circle cx="49" cy="35" r="5" fill="#38bdf8" opacity="0.8" />
+                          <rect x="46" y="32" width="6" height="3" rx="1" fill="#0f172a" />
+                        </g>
                       )}
 
                       {/* Dirt specks */}

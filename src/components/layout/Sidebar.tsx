@@ -5,6 +5,7 @@ import {
   BookMarked,
   BarChart3,
   CheckCircle2,
+  X,
 } from 'lucide-react';
 import { useStudy } from '../../context/StudyContext';
 import { LESSON_1_DATA } from '../../data/lesson1Data';
@@ -39,10 +40,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <aside className={`site-sidebar ${isOpenMobile ? 'mobile-open' : ''}`}>
       <div className="sidebar-header">
-        <div className="sidebar-course-tag">Sistemas Inteligentes</div>
-        <div className="sidebar-course-name">Interactive Platform</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-          ESII Albacete · UCLM 2026/27
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div className="sidebar-course-tag">Sistemas Inteligentes</div>
+            <div className="sidebar-course-name">Interactive Platform</div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+              ESII Albacete · UCLM 2026/27
+            </div>
+          </div>
+          <button
+            onClick={onCloseMobile}
+            className="sidebar-close-btn"
+            aria-label="Close navigation"
+          >
+            <X size={18} />
+          </button>
         </div>
       </div>
 
