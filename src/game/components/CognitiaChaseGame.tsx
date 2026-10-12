@@ -627,8 +627,8 @@ export const CognitiaChaseGame: React.FC = () => {
             }}
           />
 
-          {/* Overlay Message when Game State is Ready / Paused / Over */}
-          {gameState !== 'running' && (
+          {/* Overlay Message when Game State is Ready / Paused / Over (NOT during player_caught death animation) */}
+          {gameState !== 'running' && gameState !== 'player_caught' && (
             <div
               style={{
                 position: 'absolute',
@@ -640,11 +640,12 @@ export const CognitiaChaseGame: React.FC = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.85rem',
+                zIndex: 10,
               }}
             >
               <h3 style={{ color: '#F1F5F9', fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>
                 {gameState === 'ready'
-                  ? 'PRESS ANY ARROW OR WASD TO START'
+                  ? 'READY!'
                   : gameState === 'paused'
                   ? 'PAUSED'
                   : gameState === 'level_cleared'
@@ -654,17 +655,38 @@ export const CognitiaChaseGame: React.FC = () => {
               <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: 0 }}>
                 {gameState === 'ready'
                   ? 'Use arrow keys or touch pad below to guide your probe'
-                  : 'Press Esc to resume'}
+                  : gameState === 'paused'
+                  ? 'Press Esc to resume'
+                  : gameState === 'level_cleared'
+                  ? 'All energy nodes harvested!'
+                  : `All probes neutralized. Final Score: ${score}`}
               </p>
               <button
                 onClick={() => {
-                  engineRef.current?.start();
-                  setGameState('running');
+                  if (gameState === 'game_over') {
+                    engineRef.current?.resetGame();
+                    setGameState('ready');
+                  } else if (gameState === 'level_cleared') {
+                    engineRef.current?.resetLife(true);
+                    setGameState('ready');
+                  } else if (gameState === 'paused') {
+                    engineRef.current?.resume();
+                    setGameState('running');
+                  } else {
+                    engineRef.current?.start();
+                    setGameState('running');
+                  }
                 }}
                 className="btn-tactile btn-primary"
                 style={{ padding: '0.5rem 1.5rem', fontWeight: 800 }}
               >
-                {gameState === 'ready' ? 'START MISSION ▶' : 'CONTINUE ▶'}
+                {gameState === 'ready'
+                  ? 'START MISSION ▶'
+                  : gameState === 'paused'
+                  ? 'RESUME ▶'
+                  : gameState === 'level_cleared'
+                  ? 'NEXT LEVEL ▶'
+                  : 'PLAY AGAIN ↺'}
               </button>
             </div>
           )}

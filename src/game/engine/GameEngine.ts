@@ -71,8 +71,8 @@ export class GameEngine {
   // Fixed timestep physics accumulator (60Hz)
   private readonly FIXED_DELTA = 1 / 60;
   private accumulator = 0;
-  private readyTimer = 2.0;
-  private deathTimer = 0;
+  public readyTimer = 2.0;
+  public deathTimer = 0;
 
   public events: GameEngineEvents = {};
 
@@ -203,6 +203,11 @@ export class GameEngine {
   }
 
   public start(): void {
+    if (this.state === 'game_over') {
+      this.resetGame();
+    } else if (this.state === 'player_caught') {
+      this.resetLife(true);
+    }
     this.state = 'running';
     this.readyTimer = 0;
     this.sound.playIntroJingle();
@@ -231,6 +236,7 @@ export class GameEngine {
   }
 
   public setPlayerDirection(dir: Direction): void {
+    if (this.state === 'player_caught') return; // Cannot steer while dying!
     this.player.nextDir = dir;
     if (this.state === 'ready' && dir !== 'none') {
       this.start();
@@ -244,6 +250,7 @@ export class GameEngine {
       this.currentLevel = 1;
       this.dotsEatenThisRound = 0;
       this.extraLifeAwarded = false;
+      this.fruit.active = false;
     }
 
     this.state = 'ready';
@@ -262,7 +269,7 @@ export class GameEngine {
     this.player.dir = 'left';
     this.player.nextDir = 'none';
     this.player.eatPauseFrames = 0;
-    this.player.invulnerableTimer = 1.0;
+    this.player.invulnerableTimer = 2.0;
 
     // Reset ghost positions
     const spawns = this.maze.ghostSpawns;
@@ -577,25 +584,36 @@ export class GameEngine {
       if (p.dir === 'up') ny -= dist;
       if (p.dir === 'down') ny += dist;
 
-      // Tunnel wrap-around at row 14
-      if (curTileY === 14) {
-        if (nx < -0.5) nx = this.maze.width - 0.5;
-        else if (nx > this.maze.width - 0.5) nx = -0.5;
-        p.x = nx;
-      } else {
-        // Wall collision check
-        const checkX = p.dir === 'left' ? Math.floor(nx) : Math.ceil(nx);
-        const checkY = p.dir === 'up' ? Math.floor(ny) : Math.ceil(ny);
-
-        if (this.maze.isWalkable(checkX, curTileY, false) && (p.dir === 'left' || p.dir === 'right')) {
-          p.x = nx;
-        } else if (p.dir === 'left' || p.dir === 'right') {
-          p.x = curTileX;
+      // Tunnel wrap-around at row 14 for horizontal movement
+      if (curTileY === 14 && (p.dir === 'left' || p.dir === 'right')) {
+        if (nx < -0.5) {
+          nx = this.maze.width - 0.5;
+        } else if (nx > this.maze.width - 0.5) {
+          nx = -0.5;
         }
+      }
 
-        if (this.maze.isWalkable(curTileX, checkY, false) && (p.dir === 'up' || p.dir === 'down')) {
+      // Horizontal movement collision check
+      if (p.dir === 'left' || p.dir === 'right') {
+        if (curTileY === 14 && (nx < 0 || nx >= this.maze.width - 1)) {
+          // Inside tunnel screen-edge corridor: allow free wrap traversal
+          p.x = nx;
+        } else {
+          const checkX = p.dir === 'left' ? Math.floor(nx) : Math.ceil(nx);
+          if (this.maze.isWalkable(checkX, curTileY, false)) {
+            p.x = nx;
+          } else {
+            p.x = curTileX;
+          }
+        }
+      }
+
+      // Vertical movement collision check (unblocked on ALL rows including row 14)
+      if (p.dir === 'up' || p.dir === 'down') {
+        const checkY = p.dir === 'up' ? Math.floor(ny) : Math.ceil(ny);
+        if (this.maze.isWalkable(curTileX, checkY, false)) {
           p.y = ny;
-        } else if (p.dir === 'up' || p.dir === 'down') {
+        } else {
           p.y = curTileY;
         }
       }

@@ -249,6 +249,45 @@ function runFidelityTests() {
   assert('Fruit spawns after 70 dots eaten', freshEngine.fruit.active === true, `Fruit active: ${freshEngine.fruit.active}`);
   assert('Level 1 fruit is Cherry worth 100 points', freshEngine.fruit.type === 'cherry' && freshEngine.fruit.points === 100);
 
+  // 12. Vertical Movement Across Row 14 (Tunnel Equator)
+  const moveEngine = new GameEngine(CLASSIC_ARCADE_MAZE, 'arcade');
+  moveEngine.start();
+  // Place at row 14, column 6 (vertical corridor)
+  moveEngine.player.x = 6;
+  moveEngine.player.y = 14;
+  moveEngine.player.dir = 'up';
+  moveEngine.player.nextDir = 'up';
+  for (let i = 0; i < 15; i++) {
+    moveEngine.update(1 / 60);
+  }
+  assert('Player can move UP across row 14 to upper half of map', moveEngine.player.y < 13.8, `Player y: ${moveEngine.player.y}`);
+
+  moveEngine.player.x = 6;
+  moveEngine.player.y = 14;
+  moveEngine.player.dir = 'down';
+  moveEngine.player.nextDir = 'down';
+  for (let i = 0; i < 15; i++) {
+    moveEngine.update(1 / 60);
+  }
+  assert('Player can move DOWN across row 14 to lower half of map', moveEngine.player.y > 14.2, `Player y: ${moveEngine.player.y}`);
+
+  // 13. Player Caught & Spawn Relocation
+  const deathEngine = new GameEngine(CLASSIC_ARCADE_MAZE, 'arcade');
+  deathEngine.start();
+  // Move player right on top of Blinky
+  deathEngine.player.x = deathEngine.ghosts[0].x;
+  deathEngine.player.y = deathEngine.ghosts[0].y;
+  deathEngine.player.invulnerableTimer = 0;
+  deathEngine.update(1 / 60);
+  assert('Player enters caught state on ghost collision', deathEngine.state === 'player_caught', `State: ${deathEngine.state}`);
+
+  // Fast-forward death animation timer (1.5s)
+  deathEngine.update(1.6);
+  assert('After death timer expires, game enters ready state', deathEngine.state === 'ready', `State: ${deathEngine.state}`);
+  assert('Player position is reset to spawn (13.5, 23)', deathEngine.player.x === 13.5 && deathEngine.player.y === 23, `Pos: (${deathEngine.player.x}, ${deathEngine.player.y})`);
+  assert('Ghosts are reset to house / pen door', deathEngine.ghosts.find(g => g.personality === 'blinky')?.y === 11, `Blinky y: ${deathEngine.ghosts[0].y}`);
+  assert('Player has temporary invulnerability on spawn', deathEngine.player.invulnerableTimer > 0, `Invuln: ${deathEngine.player.invulnerableTimer}`);
+
   console.log(`\nResults: ${passed} / ${total} authentic arcade fidelity tests passed.`);
   if (passed !== total) {
     if (typeof (globalThis as any).process !== 'undefined') {
