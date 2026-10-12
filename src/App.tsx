@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAppRouter } from './lib/router/useAppRouter';
 import { StudyProvider } from './context/StudyContext';
 import { LabThemeProvider } from './context/LabThemeContext';
 import { LivingFieldCanvas } from './components/common/LivingFieldCanvas';
@@ -19,22 +20,13 @@ import './styles/components.css';
 import './styles/visualizers.css';
 
 export function AppContent() {
-  const [currentView, setCurrentView] = useState<'home' | 'lesson' | 'practice' | 'glossary' | 'progress' | 'play'>('home');
-  const [currentLessonId, setCurrentLessonId] = useState<'lesson-1' | 'lesson-2' | 'lesson-3'>('lesson-1');
-  const [currentSectionId, setCurrentSectionId] = useState<string | undefined>(undefined);
+  const {
+    currentView,
+    currentLessonId,
+    currentSectionId,
+    handleNavigate,
+  } = useAppRouter();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
-  const handleNavigate = (view: string, lessonId?: string, sectionId?: string) => {
-    if (view === 'lesson' && lessonId) {
-      setCurrentLessonId(lessonId as any);
-      setCurrentSectionId(sectionId);
-      setCurrentView('lesson');
-    } else {
-      setCurrentView(view as any);
-      setCurrentSectionId(undefined);
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   return (
     <div className="app-container">
