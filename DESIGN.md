@@ -221,3 +221,15 @@ A fusion of:
 - **Procedural Audio**:
   - 100% synthesized Web Audio API chiptune soundscape (blips, radar pings, alarm siren, victory chime) with mute toggle.
 
+---
+
+## 7. SPA ROUTING & BROWSER HISTORY INTEGRATION (`src/lib/router/`)
+
+### 7.1 The Browser Back Button Problem & Solution
+- **The Bug**: Pure state-driven navigation (`useState` in `App.tsx`) leaves the browser history stack empty after page transitions. Clicking the browser Back button popped the browser out of the website entirely.
+- **The Solution**: Full integration with the HTML5 History API (`window.history.pushState` and `popstate` events) encapsulated in `useAppRouter`.
+- **Key Capabilities**:
+  1. **Deterministic Bi-Directional Mapping**: Clean semantic URLs (`/`, `/lessons/lesson-1`, `/lessons/lesson-2#section`, `/practice`, `/glossary`, `/progress`, `/play`) with hash routing fallback (`#/play`).
+  2. **Push on Navigation**: Every navigation action (Sidebar, Header, Cards, Search Modal) pushes a typed state entry (`RouteState`) and updates `document.title`.
+  3. **Seamless Back/Forward**: `window.addEventListener('popstate')` restores view state, lesson ID, and section scroll target smoothly without leaving the application.
+  4. **Root Anchor Protection**: On initial load, a root anchor state is primed. Deep links automatically anchor Home (`/`) underneath them, ensuring that pressing the browser Back button from a deep link or internal screen always navigates back inside Cognitia rather than terminating the session.
