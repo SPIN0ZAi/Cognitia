@@ -28,7 +28,7 @@ export const CLASSIC_ARCADE_MAZE: string[] = [
   '     #.##          ##.#     ', // 11
   '     #.## ###--### ##.#     ', // 12 (door at cols 13-14)
   '######.## #      # ##.######', // 13
-  '          #      #          ', // 14 (tunnel row, wrap-around)
+  '       ## #      # ##       ', // 14 (tunnel row, wrap-around)
   '######.## #      # ##.######', // 15
   '     #.## ######## ##.#     ', // 16
   '     #.##          ##.#     ', // 17 (fruit spawn at 13.5, 17)
@@ -95,6 +95,7 @@ export class MazeMap {
   private parseLayout(layout: string[]): void {
     this.grid = [];
     this.totalPellets = 0;
+    const gCoords: GridCoord[] = [];
 
     for (let y = 0; y < this.height; y++) {
       const row: TileType[] = [];
@@ -136,6 +137,7 @@ export class MazeMap {
             break;
           case 'G':
             tile = 'empty';
+            gCoords.push({ x, y });
             break;
           case ' ':
           default:
@@ -148,6 +150,42 @@ export class MazeMap {
       this.grid.push(row);
     }
 
+    // Configure ghost spawns and scatter targets for custom/campaign layouts
+    if (gCoords.length > 0) {
+      const primaryG = gCoords[0];
+      this.ghostSpawn = primaryG;
+      this.ghostSpawns = {
+        blinky: gCoords[0] || primaryG,
+        pinky: gCoords[1] || primaryG,
+        inky: gCoords[2] || primaryG,
+        clyde: gCoords[3] || primaryG,
+      };
+      this.scatterTargets = {
+        blinky: { x: Math.max(1, this.width - 2), y: 1 },
+        pinky: { x: 1, y: 1 },
+        inky: { x: Math.max(1, this.width - 2), y: Math.max(1, this.height - 2) },
+        clyde: { x: 1, y: Math.max(1, this.height - 2) },
+      };
+      this.fruitSpawn = {
+        x: Math.round(this.width / 2),
+        y: Math.round(this.height / 2),
+      };
+    } else if (this.width !== 28 || this.height !== 31) {
+      this.ghostSpawn = { x: Math.round(this.width / 2), y: Math.round(this.height / 2) };
+      this.ghostSpawns = {
+        blinky: { ...this.ghostSpawn },
+        pinky: { ...this.ghostSpawn },
+        inky: { ...this.ghostSpawn },
+        clyde: { ...this.ghostSpawn },
+      };
+      this.scatterTargets = {
+        blinky: { x: Math.max(1, this.width - 2), y: 1 },
+        pinky: { x: 1, y: 1 },
+        inky: { x: Math.max(1, this.width - 2), y: Math.max(1, this.height - 2) },
+        clyde: { x: 1, y: Math.max(1, this.height - 2) },
+      };
+    }
+
     this.remainingPellets = this.totalPellets;
   }
 
@@ -155,8 +193,8 @@ export class MazeMap {
     const rx = Math.floor(x);
     const ry = Math.floor(y);
 
-    // Tunnel wrap-around check at row 14
-    if (ry === 14 && (rx < 0 || rx >= this.width)) {
+    // Tunnel wrap-around check at row 14 (classic arcade only)
+    if (this.height === 31 && ry === 14 && (rx < 0 || rx >= this.width)) {
       return 'empty';
     }
 
@@ -170,8 +208,8 @@ export class MazeMap {
     const rx = Math.floor(x);
     const ry = Math.floor(y);
 
-    // Tunnel corridor wrap-around
-    if (ry === 14 && (rx < 0 || rx >= this.width)) {
+    // Tunnel corridor wrap-around (classic arcade only)
+    if (this.height === 31 && ry === 14 && (rx < 0 || rx >= this.width)) {
       return true;
     }
 
@@ -180,8 +218,11 @@ export class MazeMap {
     }
 
     // Protect off-board void areas (columns outside 5..22 on rows 10..12 and 16..18)
-    if ((rx < 5 || rx > 22) && ((ry >= 10 && ry <= 12) || (ry >= 16 && ry <= 18))) {
-      return false;
+    // ONLY applied to the classic 28x31 layout
+    if (this.width === 28 && this.height === 31) {
+      if ((rx < 5 || rx > 22) && ((ry >= 10 && ry <= 12) || (ry >= 16 && ry <= 18))) {
+        return false;
+      }
     }
 
     const t = this.grid[ry][rx];
@@ -347,15 +388,15 @@ export const DEFAULT_MAZE_LAYOUTS = {
   ],
   level3_plunger: [
     '###################',
-    '#P#.............#G#',
-    '#.#.###########.#.#',
+    '#P...............G#',
+    '#.#.####.####.#.#.#',
     '#.#.#.........#.#.#',
-    '#.#.#.#######.#.#.#',
+    '#.#.#.###.###.#.#.#',
     '#...#.#.....#.#...#',
     '###.#.#.###.#.#####',
     '#...#...#.#.#.....#',
     '#.#######.#.#####.#',
-    '#o........#......o#',
+    '#o...............o#',
     '###################',
   ],
   level4_gambler: [
@@ -390,7 +431,7 @@ export const DEFAULT_MAZE_LAYOUTS = {
     '#####################',
     '#P........#........G#',
     '#.###.###.#.###.###.#',
-    '#o#.#.#...M...#.#.#o#',
+    '#o###.#...M...#.###o#',
     '#.###.###.#.###.###.#',
     '#.........#.........#',
     '###.#####...#####.###',
@@ -402,7 +443,7 @@ export const DEFAULT_MAZE_LAYOUTS = {
     '#.###.###.#.###.###.#',
     '#o..#.#...M...#.#..o#',
     '###.#.#.#####.#.#.###',
-    '#.......#...#.......#',
+    '#.......#####.......#',
     '#####################',
   ],
 };

@@ -238,6 +238,9 @@ export class GameEngine {
   public setPlayerDirection(dir: Direction): void {
     if (this.state === 'player_caught') return; // Cannot steer while dying!
     this.player.nextDir = dir;
+    if (this.player.dir === 'none' && dir !== 'none') {
+      this.player.dir = dir;
+    }
     if (this.state === 'ready' && dir !== 'none') {
       this.player.dir = dir;
       this.start();
@@ -274,6 +277,8 @@ export class GameEngine {
 
     // Reset ghost positions
     const spawns = this.maze.ghostSpawns;
+    const isClassic = this.maze.width === 28 && this.maze.height === 31;
+
     this.ghosts.forEach((g) => {
       if (g.personality === 'blinky' || g.personality === 'astar') {
         g.x = spawns.blinky.x;
@@ -283,18 +288,18 @@ export class GameEngine {
       } else if (g.personality === 'pinky' || g.personality === 'greedy') {
         g.x = spawns.pinky.x;
         g.y = spawns.pinky.y;
-        g.inHouse = true;
-        g.dir = 'up';
+        g.inHouse = isClassic;
+        g.dir = isClassic ? 'up' : 'left';
       } else if (g.personality === 'inky' || g.personality === 'ucs') {
         g.x = spawns.inky.x;
         g.y = spawns.inky.y;
-        g.inHouse = true;
-        g.dir = 'up';
+        g.inHouse = isClassic;
+        g.dir = isClassic ? 'up' : 'left';
       } else {
         g.x = spawns.clyde.x;
         g.y = spawns.clyde.y;
-        g.inHouse = true;
-        g.dir = 'up';
+        g.inHouse = isClassic;
+        g.dir = isClassic ? 'up' : 'left';
       }
       g.nextDir = g.dir;
       g.mode = 'scatter';
@@ -474,13 +479,23 @@ export class GameEngine {
   }
 
   private releaseGhostFromHouse(ghost: GhostEntity): void {
-    // Move up through the ghost house door to (13.5, 11)
-    ghost.x = 13.5;
-    ghost.y = 11;
-    ghost.inHouse = false;
-    ghost.dir = 'left';
-    ghost.nextDir = 'left';
-    ghost.mode = this.globalGhostMode;
+    const isClassic = this.maze.width === 28 && this.maze.height === 31;
+    if (isClassic) {
+      // Move up through the ghost house door to (13.5, 11)
+      ghost.x = 13.5;
+      ghost.y = 11;
+      ghost.inHouse = false;
+      ghost.dir = 'left';
+      ghost.nextDir = 'left';
+      ghost.mode = this.globalGhostMode;
+    } else {
+      ghost.x = this.maze.ghostSpawn.x;
+      ghost.y = this.maze.ghostSpawn.y;
+      ghost.inHouse = false;
+      ghost.dir = 'left';
+      ghost.nextDir = 'left';
+      ghost.mode = this.globalGhostMode;
+    }
   }
 
   /**
@@ -540,6 +555,16 @@ export class GameEngine {
 
     const curTileX = Math.round(p.x);
     const curTileY = Math.round(p.y);
+    const dist = p.speed * dt;
+
+    // If player is stationary (at round start or after stopping), allow immediate movement in nextDir if walkable
+    if (p.dir === 'none' && p.nextDir !== 'none') {
+      const checkTileX = p.nextDir === 'left' ? Math.floor(p.x) : (p.nextDir === 'right' ? Math.ceil(p.x) : curTileX);
+      const checkTileY = p.nextDir === 'up' ? Math.floor(p.y) : (p.nextDir === 'down' ? Math.ceil(p.y) : curTileY);
+      if (this.maze.isWalkable(checkTileX, checkTileY, false)) {
+        p.dir = p.nextDir;
+      }
+    }
 
     // Pre-Turn & Corner-Cutting
     if (p.nextDir !== 'none' && p.nextDir !== p.dir) {
@@ -547,11 +572,12 @@ export class GameEngine {
       if (p.nextDir === OPPOSITE_DIRECTION[p.dir]) {
         p.dir = p.nextDir;
       } else {
-        // Perpendicular corner-cutting: if within 0.4 tiles of center and turn path is open
+        // Perpendicular corner-cutting: if within tolerance of center and turn path is open
+        const cornerTolerance = Math.max(0.48, dist * 1.5);
         const dxFromCenter = Math.abs(p.x - curTileX);
         const dyFromCenter = Math.abs(p.y - curTileY);
 
-        if (dxFromCenter < 0.4 && dyFromCenter < 0.4) {
+        if (dxFromCenter <= cornerTolerance && dyFromCenter <= cornerTolerance) {
           const offset = DIR_OFFSETS[p.nextDir];
           const targetTileX = curTileX + offset.dx;
           const targetTileY = curTileY + offset.dy;
@@ -569,9 +595,6 @@ export class GameEngine {
       }
     }
 
-    // Calculate movement distance
-    const dist = p.speed * dt;
-
     if (p.dir !== 'none') {
       let nx = p.x;
       let ny = p.y;
@@ -581,8 +604,10 @@ export class GameEngine {
       if (p.dir === 'up') ny -= dist;
       if (p.dir === 'down') ny += dist;
 
-      // Tunnel wrap-around at row 14 for horizontal movement
-      if (curTileY === 14 && (p.dir === 'left' || p.dir === 'right')) {
+      const isClassic = this.maze.width === 28 && this.maze.height === 31;
+
+      // Tunnel wrap-around at row 14 for horizontal movement (classic arcade only)
+      if (isClassic && curTileY === 14 && (p.dir === 'left' || p.dir === 'right')) {
         if (nx < -0.5) {
           nx = this.maze.width - 0.5;
         } else if (nx > this.maze.width - 0.5) {
@@ -592,7 +617,7 @@ export class GameEngine {
 
       // Horizontal movement collision check
       if (p.dir === 'left' || p.dir === 'right') {
-        if (curTileY === 14 && (nx < 0 || nx >= this.maze.width - 1)) {
+        if (isClassic && curTileY === 14 && (nx < 0 || nx >= this.maze.width - 1)) {
           // Inside tunnel screen-edge corridor: allow free wrap traversal
           p.x = nx;
         } else {
@@ -601,17 +626,31 @@ export class GameEngine {
             p.x = nx;
           } else {
             p.x = curTileX;
+            // Blocked against wall: immediately turn if queued perpendicular direction is open
+            if (p.nextDir === 'up' || p.nextDir === 'down') {
+              const off = DIR_OFFSETS[p.nextDir];
+              if (this.maze.isWalkable(curTileX + off.dx, curTileY + off.dy, false)) {
+                p.dir = p.nextDir;
+              }
+            }
           }
         }
       }
 
-      // Vertical movement collision check (unblocked on ALL rows including row 14)
+      // Vertical movement collision check
       if (p.dir === 'up' || p.dir === 'down') {
         const checkY = p.dir === 'up' ? Math.floor(ny) : Math.ceil(ny);
         if (this.maze.isWalkable(curTileX, checkY, false)) {
           p.y = ny;
         } else {
           p.y = curTileY;
+          // Blocked against wall: immediately turn if queued perpendicular direction is open
+          if (p.nextDir === 'left' || p.nextDir === 'right') {
+            const off = DIR_OFFSETS[p.nextDir];
+            if (this.maze.isWalkable(curTileX + off.dx, curTileY + off.dy, false)) {
+              p.dir = p.nextDir;
+            }
+          }
         }
       }
     }
@@ -699,6 +738,25 @@ export class GameEngine {
         }
       }
 
+      // If ghost is in the ghost house/pen, bob vertically and never escape through ceiling
+      if (ghost.inHouse) {
+        const bobSpeed = 2.0 * dt;
+        if (ghost.dir === 'up') {
+          ghost.y -= bobSpeed;
+          if (ghost.y <= 13.5) {
+            ghost.y = 13.5;
+            ghost.dir = 'down';
+          }
+        } else {
+          ghost.y += bobSpeed;
+          if (ghost.y >= 14.5) {
+            ghost.y = 14.5;
+            ghost.dir = 'up';
+          }
+        }
+        continue;
+      }
+
       const curTileX = Math.round(ghost.x);
       const curTileY = Math.round(ghost.y);
 
@@ -720,21 +778,26 @@ export class GameEngine {
       const moveDist = ghost.speed * dt;
 
       // Check if ghost reached ghost pen door while eaten
+      const isClassic = this.maze.width === 28 && this.maze.height === 31;
+      const homeDoorX = isClassic ? 13.5 : this.maze.ghostSpawn.x;
+      const homeDoorY = isClassic ? 11 : this.maze.ghostSpawn.y;
       if (ghost.mode === 'eaten') {
-        const distToDoor = Math.hypot(ghost.x - 13.5, ghost.y - 11);
-        if (distToDoor < 0.3) {
+        const distToDoor = Math.hypot(ghost.x - homeDoorX, ghost.y - homeDoorY);
+        if (distToDoor < 0.5) {
           // Enter house, revive, and exit
           ghost.mode = this.globalGhostMode;
           ghost.frightenedTimer = 0;
           ghost.dir = 'left';
+          ghost.nextDir = 'left';
         }
       }
 
       // Check intersection decision point: when near tile center, pick next direction
+      const centerTolerance = Math.max(0.12, moveDist * 0.75);
       const dxCenter = Math.abs(ghost.x - curTileX);
       const dyCenter = Math.abs(ghost.y - curTileY);
 
-      if (dxCenter < 0.08 && dyCenter < 0.08) {
+      if (dxCenter <= centerTolerance && dyCenter <= centerTolerance) {
         this.aiController.updateGhostDecision(
           ghost,
           playerTile,
@@ -743,6 +806,12 @@ export class GameEngine {
           this.targetingMode
         );
         if (ghost.nextDir !== 'none') {
+          // Snap perpendicular axis to center of corridor for clean turns
+          if (ghost.nextDir === 'up' || ghost.nextDir === 'down') {
+            ghost.x = curTileX;
+          } else if (ghost.nextDir === 'left' || ghost.nextDir === 'right') {
+            ghost.y = curTileY;
+          }
           ghost.dir = ghost.nextDir;
         }
       }
@@ -757,14 +826,51 @@ export class GameEngine {
         if (ghost.dir === 'up') gy -= moveDist;
         if (ghost.dir === 'down') gy += moveDist;
 
-        // Tunnel wrap-around at row 14
-        if (curTileY === 14) {
+        // Tunnel wrap-around at row 14 (classic arcade only)
+        if (isClassic && curTileY === 14) {
           if (gx < -0.5) gx = this.maze.width - 0.5;
           else if (gx > this.maze.width - 0.5) gx = -0.5;
         }
 
-        ghost.x = gx;
-        ghost.y = gy;
+        // Collision & Bounds check:
+        let canMove = true;
+        if (isClassic && curTileY === 14 && (gx < 0 || gx >= this.maze.width - 1)) {
+          canMove = true;
+        } else {
+          const checkX = ghost.dir === 'left' ? Math.floor(gx) : (ghost.dir === 'right' ? Math.ceil(gx) : curTileX);
+          const checkY = ghost.dir === 'up' ? Math.floor(gy) : (ghost.dir === 'down' ? Math.ceil(gy) : curTileY);
+
+          if (!this.maze.isWalkable(checkX, checkY, ghost.mode === 'eaten')) {
+            canMove = false;
+          }
+        }
+
+        if (canMove) {
+          ghost.x = gx;
+          ghost.y = gy;
+        } else {
+          // Blocked by wall: snap to tile center and force immediate decision recalculation
+          ghost.x = curTileX;
+          ghost.y = curTileY;
+          this.aiController.updateGhostDecision(
+            ghost,
+            playerTile,
+            this.player.dir,
+            blinkyTile,
+            this.targetingMode
+          );
+          if (ghost.nextDir !== 'none') {
+            ghost.dir = ghost.nextDir;
+          }
+        }
+
+        // Hard boundary safety clamp: ghosts NEVER leave maze boundaries under any circumstances
+        if (isClassic && curTileY === 14) {
+          ghost.y = Math.max(0, Math.min(this.maze.height - 1, ghost.y));
+        } else {
+          ghost.x = Math.max(0, Math.min(this.maze.width - 1, ghost.x));
+          ghost.y = Math.max(0, Math.min(this.maze.height - 1, ghost.y));
+        }
       }
     }
   }

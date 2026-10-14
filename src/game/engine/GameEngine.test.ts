@@ -298,6 +298,60 @@ function runFidelityTests() {
   assert('Game starts running only when player provides input', deathEngine.state === 'running', `State: ${deathEngine.state}`);
   assert('Player moves in inputted direction', deathEngine.player.dir === 'left', `Dir: ${deathEngine.player.dir}`);
 
+  // 14. 100% Dot Reachability across all mazes
+  const checkReachability = (layout: string[]) => {
+    const m = new MazeMap(layout);
+    const s = { x: Math.floor(m.playerSpawn.x), y: Math.floor(m.playerSpawn.y) };
+    const vis = new Set<string>();
+    const q = [s];
+    vis.add(`${s.x},${s.y}`);
+    while (q.length > 0) {
+      const cur = q.shift()!;
+      for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        let nx = cur.x + dx;
+        let ny = cur.y + dy;
+        if (ny === 14 && m.width === 28 && m.height === 31) {
+          if (nx < 0) nx = m.width - 1;
+          else if (nx >= m.width) nx = 0;
+        }
+        if (nx < 0 || nx >= m.width || ny < 0 || ny >= m.height) continue;
+        const k = `${nx},${ny}`;
+        if (vis.has(k)) continue;
+        if (m.isWalkable(nx, ny, false)) {
+          vis.add(k);
+          q.push({ x: nx, y: ny });
+        }
+      }
+    }
+    let unreach = 0;
+    for (let y = 0; y < m.height; y++) {
+      for (let x = 0; x < m.width; x++) {
+        const t = m.getTile(x, y);
+        if ((t === 'pellet' || t === 'power') && !vis.has(`${x},${y}`)) unreach++;
+      }
+    }
+    return unreach;
+  };
+  assert('Classic maze dots are 100% reachable', checkReachability(CLASSIC_ARCADE_MAZE) === 0);
+
+  // 15. Ghost Containment: Ghosts never leave maze boundaries
+  const boundEngine = new GameEngine(CLASSIC_ARCADE_MAZE, 'arcade', ['blinky', 'pinky', 'inky', 'clyde']);
+  boundEngine.start();
+  let ghostEscaped = false;
+  for (let f = 0; f < 600; f++) {
+    boundEngine.update(1 / 60);
+    for (const g of boundEngine.ghosts) {
+      if (g.inHouse) continue;
+      const isTunnel = Math.round(g.y) === 14;
+      const minX = isTunnel ? -1 : 0;
+      const maxX = isTunnel ? boundEngine.maze.width : boundEngine.maze.width - 1;
+      if (g.x < minX || g.x > maxX || g.y < 0 || g.y > boundEngine.maze.height - 1) {
+        ghostEscaped = true;
+      }
+    }
+  }
+  assert('Ghosts remain strictly inside maze boundaries at all times', !ghostEscaped);
+
   console.log(`\nResults: ${passed} / ${total} authentic arcade fidelity tests passed.`);
   if (passed !== total) {
     if (typeof (globalThis as any).process !== 'undefined') {
