@@ -64,7 +64,7 @@ export interface GlossaryItem {
   id: string;
   term: string;
   termEs?: string;
-  category: 'Foundation' | 'Uninformed Search' | 'Informed Search' | 'Ethics & Governance';
+  category: 'Foundation' | 'Uninformed Search' | 'Informed Search' | 'Adversarial Search' | 'Ethics & Governance';
   definition: string;
   formalNotation?: string;
   example: string;

@@ -44,6 +44,8 @@ export function parseLocation(
       lessonId = 'lesson-2';
     } else if (rawLesson === '3' || rawLesson === 'lesson-3') {
       lessonId = 'lesson-3';
+    } else if (rawLesson === '4' || rawLesson === 'lesson-4') {
+      lessonId = 'lesson-4';
     } else {
       lessonId = 'lesson-1';
     }
@@ -124,6 +126,9 @@ export function getRouteTitle(state: RouteState): string {
       }
       if (state.lessonId === 'lesson-3') {
         return 'Lesson 3: Informed Search & Heuristic Evaluation — Cognitia';
+      }
+      if (state.lessonId === 'lesson-4') {
+        return 'Lesson 4: Adversarial Search & Games — Cognitia';
       }
       return 'Lesson — Cognitia';
     case 'practice':

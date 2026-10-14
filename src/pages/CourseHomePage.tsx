@@ -16,6 +16,7 @@ import { useStudy } from '../context/StudyContext';
 import { LESSON_1_DATA } from '../data/lesson1Data';
 import { LESSON_2_DATA } from '../data/lesson2Data';
 import { LESSON_3_DATA } from '../data/lesson3Data';
+import { LESSON_4_DATA } from '../data/lesson4Data';
 import {
   TactileButton,
   StatusLed,
@@ -27,7 +28,7 @@ export const CourseHomePage: React.FC<{
   onNavigate: (view: string, lessonId?: string, sectionId?: string) => void;
 }> = ({ onNavigate }) => {
   const { progress, combinedProgress } = useStudy();
-  const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA];
+  const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA, LESSON_4_DATA];
 
   // Calculate total completed sections
   let totalSections = 0;
@@ -66,13 +67,21 @@ export const CourseHomePage: React.FC<{
         badge: 'MISSION 02',
         desc: 'Master state formulation, BFS, UCS, DFS, and the 8-state Vacuum World transition model.',
       };
-    } else {
+    } else if (!isLessonComplete('lesson-3')) {
       return {
         lessonId: 'lesson-3',
         sectionId: 'why-heuristics',
         title: 'Lesson 3: Informed Heuristics & A* Search Optimality',
         badge: 'MISSION 03',
         desc: 'Explore Manhattan heuristics, admissibility proofs, and Romania route optimization.',
+      };
+    } else {
+      return {
+        lessonId: 'lesson-4',
+        sectionId: 'competitive-environments-and-contingent-strategies',
+        title: 'Lesson 4: Adversarial Search & Decisions in Games',
+        badge: 'MISSION 04',
+        desc: 'Master Minimax, Alpha-Beta pruning, Expectiminimax, and Monte Carlo Tree Search against enemy agents.',
       };
     }
   };

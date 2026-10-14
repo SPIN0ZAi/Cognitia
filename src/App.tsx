@@ -12,6 +12,7 @@ import { CourseHomePage } from './pages/CourseHomePage';
 import { Lesson1Page } from './pages/Lesson1Page';
 import { Lesson2Page } from './pages/Lesson2Page';
 import { Lesson3Page } from './pages/Lesson3Page';
+import { Lesson4Page } from './pages/Lesson4Page';
 import { PracticePage } from './pages/PracticePage';
 import { GlossaryPage } from './pages/GlossaryPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -72,6 +73,9 @@ export function AppContent() {
           )}
           {currentView === 'lesson' && currentLessonId === 'lesson-3' && (
             <Lesson3Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-4' && (
+            <Lesson4Page activeSectionId={currentSectionId} />
           )}
           {currentView === 'practice' && <PracticePage onNavigate={handleNavigate} />}
           {currentView === 'glossary' && <GlossaryPage onNavigate={handleNavigate} />}

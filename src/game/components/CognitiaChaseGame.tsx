@@ -645,7 +645,7 @@ export const CognitiaChaseGame: React.FC = () => {
             >
               <h3 style={{ color: '#F1F5F9', fontSize: '1.4rem', fontWeight: 800, margin: 0 }}>
                 {gameState === 'ready'
-                  ? 'READY!'
+                  ? (lives < 3 ? 'READY (LIFE LOST)' : 'READY!')
                   : gameState === 'paused'
                   ? 'PAUSED'
                   : gameState === 'level_cleared'
@@ -654,7 +654,7 @@ export const CognitiaChaseGame: React.FC = () => {
               </h3>
               <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: 0 }}>
                 {gameState === 'ready'
-                  ? 'Use arrow keys or touch pad below to guide your probe'
+                  ? 'Press any arrow key, WASD, or click below to continue'
                   : gameState === 'paused'
                   ? 'Press Esc to resume'
                   : gameState === 'level_cleared'
@@ -681,7 +681,7 @@ export const CognitiaChaseGame: React.FC = () => {
                 style={{ padding: '0.5rem 1.5rem', fontWeight: 800 }}
               >
                 {gameState === 'ready'
-                  ? 'START MISSION ▶'
+                  ? (lives < 3 ? 'CONTINUE MISSION ▶' : 'START MISSION ▶')
                   : gameState === 'paused'
                   ? 'RESUME ▶'
                   : gameState === 'level_cleared'

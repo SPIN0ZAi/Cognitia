@@ -286,4 +286,99 @@ export const PRACTICE_QUESTIONS: QuizQuestion[] = [
       'From Lesson 3 (Slide 48): At depth d = 24, A*(h1) generates 39,135 nodes (b* = 1.48), whereas A*(h2) generates only 1,641 nodes (b* = 1.26). This demonstrates the dramatic practical advantage of a dominating heuristic.',
     slideRef: { lessonId: 'lesson-3', slideNumber: 48 },
   },
+  {
+    id: 'q16',
+    lessonId: 'lesson-4',
+    chapterId: 'optimal-decisions-minimax',
+    type: 'multiple-choice',
+    difficulty: 'Intermediate',
+    question:
+      'Under what precise conditions is the standard Minimax algorithm guaranteed to be optimal for player MAX?',
+    options: [
+      'It is unconditionally optimal against any opponent, even if the opponent plays completely random or erratic moves.',
+      'It is optimal if and only if the opponent (MIN) also plays optimally according to the minimax decision rule.',
+      'It is optimal only if the game tree depth is an odd integer.',
+      'It is optimal only when the heuristic evaluation function is consistent and admissible.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'As stated on Lesson 4 (Slide 26): Minimax is complete if the game tree is finite, and optimal "...if the opponent plays optimally." If the opponent plays suboptimally, Minimax may not exploit their mistakes as aggressively as an opponent-modeling strategy, but it still guarantees at least the minimax utility value.',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 26 },
+  },
+  {
+    id: 'q17',
+    lessonId: 'lesson-4',
+    chapterId: 'alphabeta-pruning',
+    type: 'calculation',
+    difficulty: 'Exam-Level',
+    question:
+      'With perfect move ordering (best moves examined first), what is the effective time complexity of Alpha-Beta pruning, and what practical implication does this have on search depth?',
+    options: [
+      'O(b * m), reducing exponential complexity to polynomial time.',
+      'O(b^(m/2)), which effectively doubles the search depth achievable within the same compute budget compared to standard Minimax O(b^m).',
+      'O((b/2)^m), reducing the branching factor by half but keeping depth identical.',
+      'O(m^b), inverting the base and exponent.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 4 (Slide 44): With perfect move ordering, alpha-beta pruning achieves a time complexity of O(b^(m/2)). Because the exponent is divided by 2, an alpha-beta search can explore twice as deep (2d) as standard minimax can in the same amount of time.',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 44 },
+  },
+  {
+    id: 'q18',
+    lessonId: 'lesson-4',
+    chapterId: 'stochastic-games-expectiminimax',
+    type: 'conceptual-match',
+    difficulty: 'Exam-Level',
+    question:
+      'In deterministic games with Minimax, applying any strictly increasing monotonic transformation f(u) to leaf utilities preserves the optimal move. Why does this property FAIL in stochastic games evaluated with Expectiminimax ("Values Matter")?',
+    options: [
+      'Because dice rolls violate the transitive property of real numbers.',
+      'Because expected values are weighted linear combinations: ∑ P(r) * f(u_r) is generally NOT equal to f(∑ P(r) * u_r) unless f is strictly linear. Non-linear monotonic transformations can invert the relative order of expected payoffs.',
+      'Because chance nodes can only have integer probabilities.',
+      'Because alpha-beta pruning cannot run on trees with more than two plies.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 4 (Slide 57 "Values matter"): In Expectiminimax, values represent expected utilities. Linear transformations preserve expected value decisions (positive affine invariance), but arbitrary order-preserving monotonic transformations (e.g. squaring or scaling specific outcomes as in Slide 57 from [2, 3, 1, 4] to [20, 30, 1, 400]) change the expectation and can flip the optimal decision from a1 to a2.',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 57 },
+  },
+  {
+    id: 'q19',
+    lessonId: 'lesson-4',
+    chapterId: 'proposed-problems-and-exam-solutions',
+    type: 'calculation',
+    difficulty: 'Exam-Level',
+    question:
+      'In UCLM Proposed Problem #1 (Slide 61), MAX (O) evaluates a Tic-Tac-Toe board using Eval(s) = (open lines for O) - (open lines for X). For the board with X at top-center (row 0, col 1) and O at center (row 1, col 1), what is Eval(s)?',
+    options: [
+      'Eval(s) = 0',
+      'Eval(s) = 2  (Lines for O: central row, right diagonal, left diagonal = 3; Lines for X: upper row = 1; 3 - 1 = 2)',
+      'Eval(s) = +1000',
+      'Eval(s) = -2',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'From Lesson 4 (Slide 61): MAX (O) has 3 open lines passing through (1,1): central row, main diagonal, and anti-diagonal (its central column is blocked by X). MIN (X) has 1 open line: upper row (its central column is blocked by O). Therefore: Eval(s) = 3 - 1 = 2.',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 61 },
+  },
+  {
+    id: 'q20',
+    lessonId: 'lesson-4',
+    chapterId: 'appendix-monte-carlo-tree-search',
+    type: 'multiple-choice',
+    difficulty: 'Intermediate',
+    question:
+      'In Monte Carlo Tree Search (MCTS), what does the UCT selection formula UCT(v) = Q(v)/N(v) + C * sqrt(ln(N(parent)) / N(v)) balance, and which child does MCTS choose during the Selection phase?',
+    options: [
+      'It balances Alpha and Beta cutoffs; it chooses the child with the smallest alpha.',
+      'It balances Exploitation (observed win rate Q/N) and Exploration (bonus for infrequently visited children); it chooses the child with the largest UCT value.',
+      'It balances memory space and call stack depth; it chooses the shallowest child.',
+      'It balances player 1 and player 2 utilities; it chooses the median child.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 4 (Slide 65): The first term Q(v)/N(v) is exploitation (favoring high observed win rates), while the second term C * sqrt(ln(N_parent) / N_v) is exploration (favoring less-explored actions). MCTS always selects the child maximizing UCT(v).',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 65 },
+  },
 ];

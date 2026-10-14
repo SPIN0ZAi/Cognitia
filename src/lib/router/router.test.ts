@@ -28,8 +28,14 @@ assert(l2.view === 'lesson' && l2.lessonId === 'lesson-2', 'Parses "/lessons/les
 const l3 = parseLocation('/lessons/lesson-3', '');
 assert(l3.view === 'lesson' && l3.lessonId === 'lesson-3', 'Parses "/lessons/lesson-3"');
 
+const l4 = parseLocation('/lessons/lesson-4', '');
+assert(l4.view === 'lesson' && l4.lessonId === 'lesson-4', 'Parses "/lessons/lesson-4"');
+
 const lAlias = parseLocation('/lesson/2', '');
 assert(lAlias.view === 'lesson' && lAlias.lessonId === 'lesson-2', 'Parses alias "/lesson/2"');
+
+const lAlias4 = parseLocation('/lesson/4', '');
+assert(lAlias4.view === 'lesson' && lAlias4.lessonId === 'lesson-4', 'Parses alias "/lesson/4"');
 
 const lSec = parseLocation('/lessons/lesson-2', '#vacuum-cleaner-world');
 assert(
@@ -62,5 +68,6 @@ assert(buildUrl('progress') === '/progress', 'buildUrl("progress") returns "/pro
 assert(getRouteTitle({ view: 'home' }).includes('Cognitia'), 'Home title contains Cognitia');
 assert(getRouteTitle({ view: 'play' }).includes('Cognitia Chase'), 'Play title contains Cognitia Chase');
 assert(getRouteTitle({ view: 'lesson', lessonId: 'lesson-1' }).includes('Lesson 1'), 'Lesson 1 title contains Lesson 1');
+assert(getRouteTitle({ view: 'lesson', lessonId: 'lesson-4' }).includes('Lesson 4'), 'Lesson 4 title contains Lesson 4');
 
 console.log('All Router tests passed successfully!');
