@@ -66,8 +66,8 @@ console.log('✔ Test 3 Passed: Corrupt data recovered gracefully without crash'
 
 // Test 4: Combined progress model
 const sampleProgress = createDefaultStorage();
-// 7 sections out of 14 = 50%
-for (let i = 0; i < 7; i++) {
+// 16 sections out of 32 = 50%
+for (let i = 0; i < 16; i++) {
   sampleProgress.study.completedSections[`s-${i}`] = true;
 }
 // 15 quiz answers correct = 100%

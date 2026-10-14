@@ -385,4 +385,116 @@ export const GLOSSARY_DATA: GlossaryItem[] = [
     relatedSectionId: 'uniform-cost-search',
     slideRef: { lessonId: 'lesson-2', slideNumber: 59 },
   },
+  {
+    id: 'minimax-algorithm',
+    term: 'Minimax Algorithm',
+    termEs: 'Algoritmo Minimax',
+    category: 'Adversarial Search',
+    definition:
+      'A recursive decision algorithm for two-player zero-sum games that computes the optimal move assuming the opponent plays perfectly to minimize the player\'s payoff.',
+    formalNotation: '\\text{Minimax}(s) = \\begin{cases} \\text{Utility}(s) & \\text{if Terminal}(s) \\\\ \\max_a \\text{Minimax}(\\text{Result}(s,a)) & \\text{if } \\text{Player}(s)=\\text{MAX} \\\\ \\min_a \\text{Minimax}(\\text{Result}(s,a)) & \\text{if } \\text{Player}(s)=\\text{MIN} \\end{cases}',
+    example:
+      'Choosing action a1 at root node A because Minimax(B) = 3 exceeds Minimax(C) = 2 and Minimax(D) = 2.',
+    commonConfusion:
+      'Minimax is complete only if the game tree is finite. It is optimal only if the opponent plays optimally; against suboptimal players, other strategies might achieve higher scores.',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'minimax-value-and-formulation',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 19 },
+  },
+  {
+    id: 'alphabeta-pruning',
+    term: 'Alpha-Beta (α-β) Pruning',
+    termEs: 'Poda Alfa-Beta',
+    category: 'Adversarial Search',
+    definition:
+      'A search optimization technique that prunes branches from the minimax game tree that cannot possibly influence the final decision at the root, maintaining α (the best MAX choice so far) and β (the best MIN choice so far).',
+    formalNotation: '\\alpha = \\max(\\text{path to MAX}), \\quad \\beta = \\min(\\text{path to MIN}); \\quad \\text{Prune when } \\alpha \\ge \\beta',
+    example:
+      'When exploring node C with descendant returning 2, since parent A already has α = 3 and 2 < 3, the remaining children of C are immediately pruned.',
+    commonConfusion:
+      'Alpha-beta pruning does NOT change the output move: it yields the exact same decision as full Minimax, but in best-case time O(b^(m/2)) instead of O(b^m).',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'alpha-and-beta-parameters',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 32 },
+  },
+  {
+    id: 'zero-sum-game',
+    term: 'Zero-Sum Game',
+    termEs: 'Juego de Suma Cero',
+    category: 'Adversarial Search',
+    definition:
+      'A game where the sum of utilities awarded to all players at any terminal state is zero (or a constant sum). Any gain for one player constitutes an exact, equal loss for the opponent.',
+    formalNotation: 'U_{\\text{MAX}}(s) + U_{\\text{MIN}}(s) = 0',
+    example:
+      'Chess, Checkers, Go, and Tic-Tac-Toe (+1 win, -1 loss, 0 draw).',
+    commonConfusion:
+      'Not all games are zero-sum. Prisoner\'s dilemma and economic trade negotiations have non-zero sum cooperative outcomes.',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'taxonomy-of-games',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 9 },
+  },
+  {
+    id: 'expectiminimax',
+    term: 'Expectiminimax',
+    termEs: 'Expectiminimax',
+    category: 'Adversarial Search',
+    definition:
+      'An extension of minimax to games with stochastic elements (e.g. dice, card deals) introducing CHANCE nodes that compute the probability-weighted expectation of child values.',
+    formalNotation: '\\text{ExpectiMinimax}(s) = \\sum_{r} P(r) \\cdot \\text{ExpectiMinimax}(\\text{Result}(s, r))',
+    example:
+      'In Backgammon, rolling two dice creates 21 distinct outcomes, evaluated by weighting each branch by its probability (1/36 or 1/18).',
+    commonConfusion:
+      'In Expectiminimax, "values matter": unlike deterministic minimax, arbitrary order-preserving monotonic transformations can invert the optimal decision.',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'expectiminimax-formulation-and-trace',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 55 },
+  },
+  {
+    id: 'horizon-effect',
+    term: 'Horizon Effect',
+    termEs: 'Efecto Horizonte',
+    category: 'Adversarial Search',
+    definition:
+      'A pathology in depth-limited adversarial search where the agent chooses a series of delaying or checking moves that merely push an inevitable catastrophic loss past the search horizon.',
+    formalNotation: '\\text{depth}(s) = d_{\\text{limit}} \\implies \\text{unseen catastrophe at } d_{\\text{limit}} + 1',
+    example:
+      'In chess, sacrificing pawns to give checks to the opposing king just to delay the inevitable capture of a queen beyond the 6-ply search horizon.',
+    commonConfusion:
+      'The horizon effect cannot be fixed by simply adding 1 ply of depth, as the delaying moves may just shift 1 ply deeper. It requires quiescence search or singular extensions.',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'horizon-effect-and-forward-pruning',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 50 },
+  },
+  {
+    id: 'uct-selection',
+    term: 'UCT (Upper Confidence Bounds on Trees)',
+    termEs: 'UCT (Límites Superiores de Confianza en Árboles)',
+    category: 'Adversarial Search',
+    definition:
+      'The tree selection policy used in Monte Carlo Tree Search to balance exploitation of historically high-performing moves against exploration of less-frequently visited branches.',
+    formalNotation: '\\text{UCT}(v) = \\frac{Q(v)}{N(v)} + C \\sqrt{\\frac{\\ln N(\\text{parent}(v))}{N(v)}}',
+    example:
+      'When C = √2, a child with 7 wins out of 10 visits is compared against a child with 0 wins out of 3 visits using their respective UCT scores.',
+    commonConfusion:
+      'Unvisited children (N = 0) have infinite UCT score and must always receive priority exploration before the formula is evaluated.',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'four-phases-of-mcts',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 65 },
+  },
+  {
+    id: 'mcts',
+    term: 'Monte Carlo Tree Search (MCTS)',
+    termEs: 'Búsqueda en Árbol de Monte Carlo',
+    category: 'Adversarial Search',
+    definition:
+      'A simulation-based search algorithm that builds an asymmetric game tree through four repeating phases: Selection, Expansion, Simulation (Rollout), and Backpropagation.',
+    formalNotation: '\\text{Phases: Selection} \\to \\text{Expansion} \\to \\text{Simulation} \\to \\text{Backpropagation}',
+    example:
+      'AlphaGo combining MCTS with deep policy networks for move guidance and value networks for leaf evaluation, defeating world champions in Go.',
+    commonConfusion:
+      'MCTS is an anytime algorithm: it can stop and recommend the most-visited root action at any point when time expires.',
+    relatedLessonId: 'lesson-4',
+    relatedSectionId: 'four-phases-of-mcts',
+    slideRef: { lessonId: 'lesson-4', slideNumber: 64 },
+  },
 ];

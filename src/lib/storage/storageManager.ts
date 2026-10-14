@@ -361,8 +361,8 @@ export function calculateOverallProgress(data: CognitiaStorageV1): {
   simulatorPct: number;
   gamePct: number;
 } {
-  // Total sections across 3 lectures = 14
-  const TOTAL_SECTIONS = 14;
+  // Total sections across 4 lectures = 32 (Lesson 1-3: 14, Lesson 4: 18)
+  const TOTAL_SECTIONS = 32;
   const completedSectionCount = Object.values(data.study.completedSections).filter(Boolean).length;
   const readingPct = Math.min(100, Math.round((completedSectionCount / TOTAL_SECTIONS) * 100));
 

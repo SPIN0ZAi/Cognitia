@@ -14,6 +14,7 @@ import { useStudy } from '../context/StudyContext';
 import { LESSON_1_DATA } from '../data/lesson1Data';
 import { LESSON_2_DATA } from '../data/lesson2Data';
 import { LESSON_3_DATA } from '../data/lesson3Data';
+import { LESSON_4_DATA } from '../data/lesson4Data';
 import { PRACTICE_QUESTIONS } from '../data/practiceData';
 
 export const ProgressPage: React.FC<{
@@ -30,7 +31,7 @@ export const ProgressPage: React.FC<{
     importJSON,
   } = useStudy();
 
-  const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA];
+  const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA, LESSON_4_DATA];
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [importStatus, setImportStatus] = useState<{
