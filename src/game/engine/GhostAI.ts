@@ -255,8 +255,8 @@ export class GhostAIController {
       let nx = curX + offset.dx;
       let ny = curY + offset.dy;
 
-      // Tunnel wrap-around check at row 14
-      if (ny === 14) {
+      // Tunnel wrap-around check at row 14 (classic arcade only)
+      if (this.maze.width === 28 && this.maze.height === 31 && ny === 14) {
         if (nx < 0) nx = this.maze.width - 1;
         else if (nx >= this.maze.width) nx = 0;
       }
@@ -338,6 +338,12 @@ export class GhostAIController {
     }
 
     // 2. Algorithm Mode: Course search algorithms (BFS, UCS, DFS, Greedy, A*)
+    if (ghost.mode === 'frightened') {
+      const nextDir = this.decideNextDirectionClassic(ghost, playerTile);
+      ghost.nextDir = nextDir;
+      return;
+    }
+
     let algoType: SearchAlgorithmType = 'astar';
     if (ghost.personality === 'bfs') algoType = 'bfs';
     else if (ghost.personality === 'ucs') algoType = 'ucs';
@@ -345,7 +351,14 @@ export class GhostAIController {
     else if (ghost.personality === 'greedy') algoType = 'greedy';
     else if (ghost.personality === 'astar') algoType = 'astar';
 
-    const goal = ghost.mode === 'scatter' ? ghost.scatterTile : playerTile;
+    let goal = playerTile;
+    if (ghost.mode === 'scatter') {
+      const clampedX = Math.max(1, Math.min(this.maze.width - 2, ghost.scatterTile.x));
+      const clampedY = Math.max(1, Math.min(this.maze.height - 2, ghost.scatterTile.y));
+      goal = { x: clampedX, y: clampedY };
+    } else if (ghost.mode === 'eaten') {
+      goal = { x: Math.round(this.maze.ghostSpawn.x), y: Math.round(this.maze.ghostSpawn.y) };
+    }
     ghost.targetTile = goal;
 
     const problem = this.maze.createSearchProblem(
@@ -359,13 +372,15 @@ export class GhostAIController {
     const pathCoords: GridCoord[] = result.path;
     ghost.path = pathCoords;
 
-    // Pick first step on path
+    // Pick first step on path, or fall back to classic lookahead if path is empty
     if (pathCoords.length > 1) {
       const nextStep = pathCoords[1];
       if (nextStep.x > curX) ghost.nextDir = 'right';
       else if (nextStep.x < curX) ghost.nextDir = 'left';
       else if (nextStep.y > curY) ghost.nextDir = 'down';
       else if (nextStep.y < curY) ghost.nextDir = 'up';
+    } else {
+      ghost.nextDir = this.decideNextDirectionClassic(ghost, goal);
     }
 
     const lastNode = result.solutionNode;
