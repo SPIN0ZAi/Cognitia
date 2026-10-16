@@ -73,6 +73,7 @@ export class GameEngine {
   private accumulator = 0;
   public readyTimer = 2.0;
   public deathTimer = 0;
+  private readonly initialLayout: string[];
 
   public events: GameEngineEvents = {};
 
@@ -82,6 +83,7 @@ export class GameEngine {
     ghostTypes: GhostPersonality[] = ['blinky', 'pinky', 'inky', 'clyde']
   ) {
     this.mode = mode;
+    this.initialLayout = layout;
     this.maze = new MazeMap(layout);
     this.aiController = new GhostAIController(this.maze);
     this.sound = new SoundSynthesizer(true);
@@ -111,47 +113,83 @@ export class GameEngine {
 
   public setTargetingMode(mode: TargetingMode): void {
     this.targetingMode = mode;
-    if (mode === 'algorithm') {
-      this.initGhosts(['astar', 'bfs', 'ucs', 'greedy', 'dfs']);
-    } else {
-      this.initGhosts(['blinky', 'pinky', 'inky', 'clyde']);
+    // Only re-initialize ghosts if in classic arcade mode!
+    if (this.mode === 'arcade') {
+      if (mode === 'algorithm') {
+        this.initGhosts(['astar', 'bfs', 'ucs', 'greedy', 'dfs']);
+      } else {
+        this.initGhosts(['blinky', 'pinky', 'inky', 'clyde']);
+      }
     }
   }
 
   public initGhosts(ghostTypes: GhostPersonality[]): void {
     this.ghosts = [];
+    const isClassic = this.maze.width === 28 && this.maze.height === 31;
     const spawns = this.maze.ghostSpawns;
     const scatters = this.maze.scatterTargets;
 
-    ghostTypes.forEach((type, idx) => {
-      let spawnCoord: GridCoord = spawns.blinky;
-      let scatterCoord: GridCoord = scatters.blinky;
+    ghostTypes.forEach((type) => {
+      let spawnCoord: GridCoord;
+      let scatterCoord: GridCoord;
       let inHouse = false;
       let initialDir: Direction = 'left';
 
-      if (type === 'blinky' || type === 'astar') {
-        spawnCoord = spawns.blinky; // (13.5, 11) outside
-        scatterCoord = scatters.blinky;
+      if (isClassic) {
+        if (type === 'blinky' || type === 'astar') {
+          spawnCoord = spawns.blinky; // (13.5, 11) outside
+          scatterCoord = scatters.blinky;
+          inHouse = false;
+          initialDir = 'left';
+        } else if (type === 'bfs') {
+          spawnCoord = spawns.blinky;
+          scatterCoord = scatters.blinky;
+          inHouse = false;
+          initialDir = 'right';
+        } else if (type === 'pinky' || type === 'greedy') {
+          spawnCoord = spawns.pinky; // (13.5, 14) inside
+          scatterCoord = scatters.pinky;
+          inHouse = true;
+          initialDir = 'up';
+        } else if (type === 'inky' || type === 'ucs') {
+          spawnCoord = spawns.inky; // (11.5, 14) inside
+          scatterCoord = scatters.inky;
+          inHouse = true;
+          initialDir = 'up';
+        } else if (type === 'clyde' || type === 'dfs') {
+          spawnCoord = spawns.clyde; // (15.5, 14) inside
+          scatterCoord = scatters.clyde;
+          inHouse = true;
+          initialDir = 'up';
+        } else {
+          spawnCoord = { x: 13.5, y: 11 };
+          scatterCoord = { x: 0, y: 0 };
+          inHouse = false;
+        }
+      } else {
+        // Custom/campaign layouts: ghosts NEVER have inHouse = true
         inHouse = false;
         initialDir = 'left';
-      } else if (type === 'pinky' || type === 'greedy') {
-        spawnCoord = spawns.pinky; // (13.5, 14) inside
-        scatterCoord = scatters.pinky;
-        inHouse = true;
-        initialDir = 'up';
-      } else if (type === 'inky' || type === 'ucs') {
-        spawnCoord = spawns.inky; // (11.5, 14) inside
-        scatterCoord = scatters.inky;
-        inHouse = true;
-        initialDir = 'up';
-      } else if (type === 'clyde' || type === 'dfs') {
-        spawnCoord = spawns.clyde; // (15.5, 14) inside
-        scatterCoord = scatters.clyde;
-        inHouse = true;
-        initialDir = 'up';
-      } else {
-        spawnCoord = { x: 13.5, y: 11 + idx };
-        scatterCoord = { x: 0, y: 0 };
+
+        if (type === 'blinky' || type === 'astar') {
+          spawnCoord = spawns.blinky;
+          scatterCoord = scatters.blinky;
+        } else if (type === 'bfs') {
+          spawnCoord = spawns.blinky;
+          scatterCoord = scatters.blinky;
+        } else if (type === 'pinky' || type === 'greedy') {
+          spawnCoord = spawns.pinky;
+          scatterCoord = scatters.pinky;
+        } else if (type === 'inky' || type === 'ucs') {
+          spawnCoord = spawns.inky;
+          scatterCoord = scatters.inky;
+        } else if (type === 'clyde' || type === 'dfs') {
+          spawnCoord = spawns.clyde;
+          scatterCoord = scatters.clyde;
+        } else {
+          spawnCoord = this.maze.ghostSpawn;
+          scatterCoord = { x: 1, y: 1 };
+        }
       }
 
       const profile = GHOST_PROFILES[type];
@@ -233,17 +271,48 @@ export class GameEngine {
   public togglePause(): void {
     if (this.state === 'running') this.pause();
     else if (this.state === 'paused') this.resume();
+    else if (this.state === 'ready') this.start();
+  }
+
+  public canMoveInDirection(x: number, y: number, dir: Direction): boolean {
+    if (dir === 'none') return false;
+    const curX = Math.round(x);
+    const curY = Math.round(y);
+    const off = DIR_OFFSETS[dir];
+    const targetX = curX + off.dx;
+    const targetY = curY + off.dy;
+    return this.maze.isWalkable(targetX, targetY, false);
+  }
+
+  public isPlayerStationaryAgainstWall(): boolean {
+    if (this.player.dir === 'none') return true;
+    const curX = Math.round(this.player.x);
+    const curY = Math.round(this.player.y);
+    const off = DIR_OFFSETS[this.player.dir];
+    return !this.maze.isWalkable(curX + off.dx, curY + off.dy, false);
   }
 
   public setPlayerDirection(dir: Direction): void {
     if (this.state === 'player_caught') return; // Cannot steer while dying!
+    if (dir === 'none') return;
+
     this.player.nextDir = dir;
-    if (this.player.dir === 'none' && dir !== 'none') {
-      this.player.dir = dir;
-    }
-    if (this.state === 'ready' && dir !== 'none') {
-      this.player.dir = dir;
+
+    if (this.state === 'ready') {
       this.start();
+    }
+
+    // If stationary or blocked against a wall, turn immediately if the direction is open
+    const isStationary = this.player.dir === 'none' || this.isPlayerStationaryAgainstWall();
+    if (isStationary) {
+      if (this.canMoveInDirection(this.player.x, this.player.y, dir)) {
+        this.player.dir = dir;
+        if (dir === 'up' || dir === 'down') {
+          this.player.x = Math.round(this.player.x);
+        } else if (dir === 'left' || dir === 'right') {
+          this.player.y = Math.round(this.player.y);
+        }
+      }
     }
   }
 
@@ -285,6 +354,11 @@ export class GameEngine {
         g.y = spawns.blinky.y;
         g.inHouse = false;
         g.dir = 'left';
+      } else if (g.personality === 'bfs') {
+        g.x = spawns.blinky.x;
+        g.y = spawns.blinky.y;
+        g.inHouse = false;
+        g.dir = isClassic ? 'right' : 'left';
       } else if (g.personality === 'pinky' || g.personality === 'greedy') {
         g.x = spawns.pinky.x;
         g.y = spawns.pinky.y;
@@ -316,7 +390,7 @@ export class GameEngine {
   }
 
   public resetGame(): void {
-    this.maze = new MazeMap(CLASSIC_ARCADE_MAZE);
+    this.maze = new MazeMap(this.initialLayout);
     this.resetLife(false);
   }
 
@@ -557,23 +631,23 @@ export class GameEngine {
     const curTileY = Math.round(p.y);
     const dist = p.speed * dt;
 
-    // If player is stationary (at round start or after stopping), allow immediate movement in nextDir if walkable
+    // 1. If player is stationary, take nextDir if walkable
     if (p.dir === 'none' && p.nextDir !== 'none') {
-      const checkTileX = p.nextDir === 'left' ? Math.floor(p.x) : (p.nextDir === 'right' ? Math.ceil(p.x) : curTileX);
-      const checkTileY = p.nextDir === 'up' ? Math.floor(p.y) : (p.nextDir === 'down' ? Math.ceil(p.y) : curTileY);
-      if (this.maze.isWalkable(checkTileX, checkTileY, false)) {
+      if (this.canMoveInDirection(p.x, p.y, p.nextDir)) {
         p.dir = p.nextDir;
+        if (p.dir === 'up' || p.dir === 'down') p.x = curTileX;
+        else if (p.dir === 'left' || p.dir === 'right') p.y = curTileY;
       }
     }
 
-    // Pre-Turn & Corner-Cutting
+    // 2. Pre-Turn & Corner-Cutting
     if (p.nextDir !== 'none' && p.nextDir !== p.dir) {
       // Reversal is instant
       if (p.nextDir === OPPOSITE_DIRECTION[p.dir]) {
         p.dir = p.nextDir;
       } else {
-        // Perpendicular corner-cutting: if within tolerance of center and turn path is open
-        const cornerTolerance = Math.max(0.48, dist * 1.5);
+        // Perpendicular corner-cutting: allow turn if within 0.5 tiles of corridor center
+        const cornerTolerance = 0.5;
         const dxFromCenter = Math.abs(p.x - curTileX);
         const dyFromCenter = Math.abs(p.y - curTileY);
 
@@ -627,11 +701,10 @@ export class GameEngine {
           } else {
             p.x = curTileX;
             // Blocked against wall: immediately turn if queued perpendicular direction is open
-            if (p.nextDir === 'up' || p.nextDir === 'down') {
-              const off = DIR_OFFSETS[p.nextDir];
-              if (this.maze.isWalkable(curTileX + off.dx, curTileY + off.dy, false)) {
-                p.dir = p.nextDir;
-              }
+            if (p.nextDir !== 'none' && p.nextDir !== p.dir && this.canMoveInDirection(p.x, p.y, p.nextDir)) {
+              p.dir = p.nextDir;
+              if (p.dir === 'up' || p.dir === 'down') p.x = curTileX;
+              else if (p.dir === 'left' || p.dir === 'right') p.y = curTileY;
             }
           }
         }
@@ -645,11 +718,10 @@ export class GameEngine {
         } else {
           p.y = curTileY;
           // Blocked against wall: immediately turn if queued perpendicular direction is open
-          if (p.nextDir === 'left' || p.nextDir === 'right') {
-            const off = DIR_OFFSETS[p.nextDir];
-            if (this.maze.isWalkable(curTileX + off.dx, curTileY + off.dy, false)) {
-              p.dir = p.nextDir;
-            }
+          if (p.nextDir !== 'none' && p.nextDir !== p.dir && this.canMoveInDirection(p.x, p.y, p.nextDir)) {
+            p.dir = p.nextDir;
+            if (p.dir === 'up' || p.dir === 'down') p.x = curTileX;
+            else if (p.dir === 'left' || p.dir === 'right') p.y = curTileY;
           }
         }
       }
@@ -713,6 +785,7 @@ export class GameEngine {
    * Ghost Movement & Decision Loop
    */
   private updateGhostMovement(dt: number): void {
+    const isClassic = this.maze.width === 28 && this.maze.height === 31;
     const playerTile: GridCoord = {
       x: Math.round(this.player.x),
       y: Math.round(this.player.y),
@@ -739,7 +812,8 @@ export class GameEngine {
       }
 
       // If ghost is in the ghost house/pen, bob vertically and never escape through ceiling
-      if (ghost.inHouse) {
+      // ONLY applicable to classic arcade 28x31 maze where pen exists
+      if (isClassic && ghost.inHouse) {
         const bobSpeed = 2.0 * dt;
         if (ghost.dir === 'up') {
           ghost.y -= bobSpeed;
@@ -778,7 +852,6 @@ export class GameEngine {
       const moveDist = ghost.speed * dt;
 
       // Check if ghost reached ghost pen door while eaten
-      const isClassic = this.maze.width === 28 && this.maze.height === 31;
       const homeDoorX = isClassic ? 13.5 : this.maze.ghostSpawn.x;
       const homeDoorY = isClassic ? 11 : this.maze.ghostSpawn.y;
       if (ghost.mode === 'eaten') {

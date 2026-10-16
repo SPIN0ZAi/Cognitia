@@ -107,7 +107,11 @@ export const CognitiaChaseGame: React.FC = () => {
     }
 
     const engine = new GameEngine(layout, mode, ghosts);
-    engine.setTargetingMode(targetingMode);
+    if (mode === 'arcade') {
+      engine.setTargetingMode(targetingMode);
+    } else {
+      engine.targetingMode = 'algorithm';
+    }
     engine.speedMultiplier = gameSpeed;
 
     // Load persisted high score

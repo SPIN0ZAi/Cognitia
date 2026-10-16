@@ -255,8 +255,8 @@ export class GhostAIController {
       let nx = curX + offset.dx;
       let ny = curY + offset.dy;
 
-      // Tunnel wrap-around check at row 14
-      if (ny === 14) {
+      // Tunnel wrap-around check at row 14 (classic arcade only)
+      if (this.maze.width === 28 && this.maze.height === 31 && ny === 14) {
         if (nx < 0) nx = this.maze.width - 1;
         else if (nx >= this.maze.width) nx = 0;
       }
