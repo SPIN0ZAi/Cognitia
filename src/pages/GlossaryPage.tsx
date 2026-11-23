@@ -8,7 +8,7 @@ export const GlossaryPage: React.FC<{
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const categories = ['All', 'Foundation', 'Uninformed Search', 'Informed Search', 'Ethics & Governance'];
+  const categories = ['All', ...Array.from(new Set(GLOSSARY_DATA.map((item) => item.category)))];
 
   const filtered = GLOSSARY_DATA.filter((item: any) => {
     if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;

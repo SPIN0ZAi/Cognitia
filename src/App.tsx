@@ -13,6 +13,13 @@ import { Lesson1Page } from './pages/Lesson1Page';
 import { Lesson2Page } from './pages/Lesson2Page';
 import { Lesson3Page } from './pages/Lesson3Page';
 import { Lesson4Page } from './pages/Lesson4Page';
+import { Lesson5Page } from './pages/Lesson5Page';
+import { Lesson6Page } from './pages/Lesson6Page';
+import { Lesson7Page } from './pages/Lesson7Page';
+import { Lesson8Page } from './pages/Lesson8Page';
+import { Lesson9Page } from './pages/Lesson9Page';
+import { Lesson10Page } from './pages/Lesson10Page';
+import { ExamPage } from './pages/ExamPage';
 import { PracticePage } from './pages/PracticePage';
 import { GlossaryPage } from './pages/GlossaryPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -77,6 +84,25 @@ export function AppContent() {
           {currentView === 'lesson' && currentLessonId === 'lesson-4' && (
             <Lesson4Page activeSectionId={currentSectionId} />
           )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-5' && (
+            <Lesson5Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-6' && (
+            <Lesson6Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-7' && (
+            <Lesson7Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-8' && (
+            <Lesson8Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-9' && (
+            <Lesson9Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'lesson' && currentLessonId === 'lesson-10' && (
+            <Lesson10Page activeSectionId={currentSectionId} />
+          )}
+          {currentView === 'exam' && <ExamPage />}
           {currentView === 'practice' && <PracticePage onNavigate={handleNavigate} />}
           {currentView === 'glossary' && <GlossaryPage onNavigate={handleNavigate} />}
           {currentView === 'progress' && <ProgressPage onNavigate={handleNavigate} />}

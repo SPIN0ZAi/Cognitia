@@ -381,4 +381,367 @@ export const PRACTICE_QUESTIONS: QuizQuestion[] = [
       'Lesson 4 (Slide 65): The first term Q(v)/N(v) is exploitation (favoring high observed win rates), while the second term C * sqrt(ln(N_parent) / N_v) is exploration (favoring less-explored actions). MCTS always selects the child maximizing UCT(v).',
     slideRef: { lessonId: 'lesson-4', slideNumber: 65 },
   },
+  // ==========================================
+  // LESSON 5: REINFORCEMENT LEARNING
+  // ==========================================
+  {
+    id: 'q21',
+    lessonId: 'lesson-5',
+    chapterId: 'stochastic-worlds-and-markov',
+    type: 'multiple-choice',
+    difficulty: 'Foundation',
+    question:
+      'What constitutes the Markov property in a Markov Decision Process (MDP)?',
+    options: [
+      'The agent must store the full history of past states in memory to choose actions.',
+      'The transition probability to the next state s\' and reward r depends exclusively on the current state s and action a, independent of previous history: P(s\' | s, a, s_{t-1}, ...) = P(s\' | s, a).',
+      'The transition matrix must always have zero probability along its main diagonal.',
+      'All rewards in the environment must be deterministic positive integers.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 5 (Slide 15): The Markov property states that future states depend only upon the current state and action, making past state history completely conditionally independent given s_t.',
+    slideRef: { lessonId: 'lesson-5', slideNumber: 15 },
+    hints: [
+      'Think about whether history matters if you already know where you currently are.',
+      'P(s\' | s, a) is memoryless.',
+    ],
+  },
+  {
+    id: 'q22',
+    lessonId: 'lesson-5',
+    chapterId: 'bellman-equations-and-value-iteration',
+    type: 'calculation',
+    difficulty: 'Exam-Level',
+    question:
+      'In the official UCLM Two-Stage Betting MDP (Coins Problem), what is the optimal expected utility U*(s0) with discount factor γ = 1.0?',
+    options: [
+      '30.00 €',
+      '34.35 €',
+      '25.50 €',
+      '40.00 €',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'In the UCLM official exercise sheet: At s_c (after guessing correctly), U*(s_c) = 48.75 €. At s_w (after guessing wrong), U*(s_w) = 19.95 €. At initial state s0, choosing Coin 2 with P(win)=0.5 gives: U*(s0) = 0.5 * 48.75 + 0.5 * 19.95 = 24.375 + 9.975 = 34.35 €.',
+    slideRef: { lessonId: 'lesson-5', slideNumber: 78 },
+    hints: [
+      'Recall the resolution sheet: Coin 2 at s0 gives a 50/50 chance between s_c and s_w.',
+      'Expected value is 0.5 * 48.75 + 0.5 * 19.95.',
+    ],
+  },
+  {
+    id: 'q23',
+    lessonId: 'lesson-5',
+    chapterId: 'q-learning-and-sarsa',
+    type: 'multiple-choice',
+    difficulty: 'Intermediate',
+    question:
+      'Why does off-policy Q-learning learn the risky 13-step cliff edge path in Cliff Walking, while on-policy SARSA learns the longer 17-step safe route?',
+    options: [
+      'Q-learning updates using max_{a\'} Q(s\', a\') assuming optimal future greedy actions, ignoring ε-greedy exploratory cliff falls; SARSA updates using the actual action a\' taken under the exploratory ε-greedy policy.',
+      'SARSA runs exclusively in deterministic environments, whereas Q-learning requires stochastic transitions.',
+      'Q-learning cannot handle negative rewards, while SARSA converts all rewards to absolute values.',
+      'SARSA utilizes an artificial neural network, whereas Q-learning uses a table.',
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Lesson 5 (Slide 70-74): Q-learning is off-policy because its TD target uses max_{a\'} Q(s\', a\') (evaluating the optimal greedy policy regardless of what the agent actually does next). SARSA is on-policy because it updates with the action a_{t+1} chosen by its exploratory policy, factoring the catastrophic penalty of occasional random cliff falls into edge states.',
+    slideRef: { lessonId: 'lesson-5', slideNumber: 72 },
+    hints: [
+      'Look at the update formulas: Q-learning uses max Q(s\', a\'); SARSA uses Q(s\', a\').',
+      'On-policy means the target policy matches the behavior policy.',
+    ],
+  },
+  // ==========================================
+  // LESSON 6: COMBINATORIAL OPTIMIZATION
+  // ==========================================
+  {
+    id: 'q24',
+    lessonId: 'lesson-6',
+    chapterId: 'state-as-solution-vs-paths',
+    type: 'multiple-choice',
+    difficulty: 'Foundation',
+    question:
+      'Why is A* search structurally unsuited for pure combinatorial optimization problems (e.g. antenna placement, graph coloring)?',
+    options: [
+      'Because A* cannot run on digital computers.',
+      'In combinatorial optimization, the solution is the configuration state itself, not a path of actions. A* searches path trees and requires storing an exponential open list in memory O(b^d).',
+      'Because combinatorial problems have continuous floating-point variables.',
+      'Because A* only works when all edge costs are negative.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 6 (Slide 4-8): In path-based problems (navigation, 8-puzzle), the goal is the sequence of actions. In combinatorial optimization, we only care about finding an optimal configuration c in S. Path history is meaningless, and constructing search trees leads to combinatorial explosion.',
+    slideRef: { lessonId: 'lesson-6', slideNumber: 6 },
+    hints: [
+      'Do you care how an antenna was placed first, or only where they all end up?',
+      'Memory footprint of A* is exponential in path depth.',
+    ],
+  },
+  {
+    id: 'q25',
+    lessonId: 'lesson-6',
+    chapterId: 'canonical-problems-and-encodings',
+    type: 'conceptual-match',
+    difficulty: 'Intermediate',
+    question:
+      'In the Boolean Satisfiability problem, what critical algorithmic advantage does the Max-SAT formulation provide over traditional decision SAT (Slide 24)?',
+    options: [
+      'Max-SAT proves P = NP in polynomial time.',
+      'Decision SAT presents a flat, binary step landscape (0 or 1) offering zero gradient to guide search; Max-SAT counts satisfied clauses, providing a continuous informative gradient f(c) = sum(C_i).',
+      'Max-SAT eliminates all exponential variables from the formula.',
+      'Decision SAT cannot represent CNF clauses with more than 2 literals.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 6 (Slide 24): SAT evaluation is a flat plateau (0 for unsatisfied, 1 for satisfied), so local search wanders blindly. Max-SAT transforms this into an optimization landscape where each satisfied clause increases f(c), creating an informative hill for heuristics to climb.',
+    slideRef: { lessonId: 'lesson-6', slideNumber: 24 },
+    hints: [
+      'How does an algorithm know if a guess is close to satisfying a formula?',
+      'Count how many clauses are true.',
+    ],
+  },
+  {
+    id: 'q26',
+    lessonId: 'lesson-6',
+    chapterId: 'two-processor-balancing',
+    type: 'calculation',
+    difficulty: 'Exam-Level',
+    question:
+      'In the official UCLM Two-Processor Balancing Problem (Slide 54-55) with jobs [8, 7, 6, 5, 4], fixing Job 1 to Processor 0 (c1 = 0) breaks complement symmetry. How many configurations must be evaluated?',
+    options: [
+      '32 configurations',
+      '16 configurations',
+      '64 configurations',
+      '8 configurations',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 6 (Slide 54-55): The total configuration space is 2^5 = 32. Because swapping all 0s and 1s gives the exact same workload balance, fixing c1 = 0 eliminates half the symmetric configurations: 32 / 2 = 16.',
+    slideRef: { lessonId: 'lesson-6', slideNumber: 54 },
+    hints: [
+      '2^5 is 32. Fixing 1 bit leaves 2^4 configurations.',
+      '2^4 = 16.',
+    ],
+  },
+  // ==========================================
+  // LESSON 7: LOCAL SEARCH & HILL CLIMBING
+  // ==========================================
+  {
+    id: 'q27',
+    lessonId: 'lesson-7',
+    chapterId: 'three-pathologies',
+    type: 'multiple-choice',
+    difficulty: 'Intermediate',
+    question:
+      'According to Slide 17, why does Hill Climbing fail on a Plateau, and what is the standard remedy?',
+    options: [
+      'Because the computer runs out of memory; the remedy is upgrading RAM.',
+      'All neighbors have identical scores f(x\') = f(x) giving zero gradient; the remedy is allowing sideways moves with a cap to prevent infinite loops.',
+      'All neighbors have worse scores; the remedy is terminating the program.',
+      'The step size is too large; the remedy is dividing by 2.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 7 (Slide 17): On a plateau, no neighbor strictly improves f(x). Standard Hill Climbing halts immediately. Allowing sideways moves lets the search cross flat regions, with a limit (e.g. 100 sideways moves) to prevent infinite cycles.',
+    slideRef: { lessonId: 'lesson-7', slideNumber: 17 },
+    hints: [
+      'If terrain is completely flat, gradient is zero.',
+      'A cap prevents moving back and forth forever.',
+    ],
+  },
+  {
+    id: 'q28',
+    lessonId: 'lesson-7',
+    chapterId: 'escape-metaheuristics',
+    type: 'calculation',
+    difficulty: 'Exam-Level',
+    question:
+      'In Simulated Annealing (minimization), current cost is f(x) = 15. A candidate neighbor has f(x\') = 18. If temperature T = 3.0, what is the probability P(accept x\') rounded to two decimals?',
+    options: [
+      '0.37',
+      '0.82',
+      '0.05',
+      '1.00',
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Lesson 7 (Slide 49-50): Δ = f(x\') - f(x) = 18 - 15 = 3. Since Δ > 0 (worsening move), P(accept) = exp(-Δ / T) = exp(-3 / 3.0) = exp(-1) ≈ 0.367879... which rounds to 0.37.',
+    slideRef: { lessonId: 'lesson-7', slideNumber: 50 },
+    hints: [
+      'Compute Δ = 18 - 15 = 3.',
+      'exp(-3 / 3) = exp(-1) = 1 / e ≈ 1 / 2.718 ≈ 0.37.',
+    ],
+  },
+  // ==========================================
+  // LESSON 8: GENETIC ALGORITHMS
+  // ==========================================
+  {
+    id: 'q29',
+    lessonId: 'lesson-8',
+    chapterId: 'selection-mechanisms',
+    type: 'calculation',
+    difficulty: 'Intermediate',
+    question:
+      'A population of 4 individuals has fitness values: f1 = 10, f2 = 20, f3 = 30, f4 = 40. Under Fitness Proportional Selection (Roulette Wheel), what is the selection probability p2 for Individual 2?',
+    options: [
+      '0.20 (20%)',
+      '0.25 (25%)',
+      '0.50 (50%)',
+      '0.10 (10%)',
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Lesson 8 (Slide 21): Total population fitness F = 10 + 20 + 30 + 40 = 100. The probability for Individual 2 is p2 = f2 / F = 20 / 100 = 0.20 (20%).',
+    slideRef: { lessonId: 'lesson-8', slideNumber: 21 },
+    hints: [
+      'Sum all 4 fitness values: 10 + 20 + 30 + 40.',
+      'Divide f2 by the sum.',
+    ],
+  },
+  {
+    id: 'q30',
+    lessonId: 'lesson-8',
+    chapterId: 'aibo-case-study',
+    type: 'multiple-choice',
+    difficulty: 'Exam-Level',
+    question:
+      'In the UCLM research paper on AIBO robot locomotion optimization (Alonso et al.), what primary purpose does the Machine Learning surrogate model serve?',
+    options: [
+      'It controls the robot\'s wireless network connection.',
+      'It predicts candidate fitness and filters out unpromising configurations (Buena, Regular, Mala), avoiding slow, battery-draining physical robot trials.',
+      'It replaces the genetic algorithm entirely with linear regression.',
+      'It converts the quadruped robot into a wheeled mobile platform.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'UCLM Paper Section 5: Real physical evaluation takes 30 seconds per individual on carpet, which wears motors and drains batteries. The ML surrogate classifies candidates before testing and filters out poor individuals, drastically speeding up convergence.',
+    slideRef: { lessonId: 'lesson-8', slideNumber: 'Alonso et al. Sec 5' },
+    hints: [
+      'Testing on a real robot is slow, noisy, and causes wear.',
+      'Predicting speed with ML allows skipping unpromising tests.',
+    ],
+  },
+  // ==========================================
+  // LESSON 9: MACHINE LEARNING FOUNDATIONS
+  // ==========================================
+  {
+    id: 'q31',
+    lessonId: 'lesson-9',
+    chapterId: 'overfitting-and-underfitting',
+    type: 'multiple-choice',
+    difficulty: 'Foundation',
+    question:
+      'A machine learning model achieves 0.01% error on its training dataset, but suffers 45% error when deployed on unseen test data. What is this phenomenon called, and what does it indicate about model complexity?',
+    options: [
+      'Underfitting (High Bias); the model is too simple.',
+      'Overfitting (High Variance); the model is excessively complex and memorized noise in the training set.',
+      'Data leakage; the test set was mixed with the training set.',
+      'Optimal generalization; training loss is nearly zero.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 9 (Slide 22): Overfitting occurs when a high-capacity model fits the idiosyncratic noise of the training data rather than the underlying generative distribution, leading to near-zero training error but terrible test generalization.',
+    slideRef: { lessonId: 'lesson-9', slideNumber: 22 },
+    hints: [
+      'Low train error + high test error = High Variance.',
+      'The model memorized rather than learned.',
+    ],
+  },
+  {
+    id: 'q32',
+    lessonId: 'lesson-9',
+    chapterId: 'train-val-test-split',
+    type: 'multiple-choice',
+    difficulty: 'Intermediate',
+    question:
+      'Why is it critical to maintain an independent Validation set separate from both the Training set and the Test set?',
+    options: [
+      'The validation set is used to adjust neural network weights via gradient descent.',
+      'The validation set is used for hyperparameter tuning and model selection; the test set remains untouched to provide an unbiased final estimate of real-world performance.',
+      'The validation set is discarded immediately after data collection.',
+      'Federal law requires three copies of every database.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 9 (Slide 38): If hyperparameters are tuned directly on the test set, information leaks from the test set into the model decisions ("data leakage"). The validation set guides model tuning, preserving the test set as a pristine final benchmark.',
+    slideRef: { lessonId: 'lesson-9', slideNumber: 38 },
+    hints: [
+      'Tuning on the test set causes test data leakage.',
+      'Train = weights, Val = hyperparameters, Test = final report card.',
+    ],
+  },
+  // ==========================================
+  // LESSON 10: SUPERVISED CLASSIFICATION
+  // ==========================================
+  {
+    id: 'q33',
+    lessonId: 'lesson-10',
+    chapterId: 'knn-mechanics',
+    type: 'calculation',
+    difficulty: 'Intermediate',
+    question:
+      'Given 2D query point Q(2, 3) and three training points: A(2, 1) [Red], B(5, 3) [Blue], C(2, 6) [Red]. Using Euclidean distance and k = 1, what is the predicted class for Q?',
+    options: [
+      'Class Red (Closest neighbor is A with distance d = 2.0)',
+      'Class Blue (Closest neighbor is B with distance d = 3.0)',
+      'Class Red (Closest neighbor is C with distance d = 3.0)',
+      'Voting Tie',
+    ],
+    correctAnswer: 0,
+    explanation:
+      'Lesson 10 (Slide 10): Distance to A: sqrt((2-2)^2 + (3-1)^2) = sqrt(4) = 2.0. Distance to B: sqrt((2-5)^2 + (3-3)^2) = sqrt(9) = 3.0. Distance to C: sqrt((2-2)^2 + (3-6)^2) = sqrt(9) = 3.0. The closest neighbor is A (d=2.0), whose label is Red.',
+    slideRef: { lessonId: 'lesson-10', slideNumber: 10 },
+    hints: [
+      'Compute Euclidean distance: sqrt(dx^2 + dy^2).',
+      'For A: dx=0, dy=2 -> d=2.',
+    ],
+  },
+  {
+    id: 'q34',
+    lessonId: 'lesson-10',
+    chapterId: 'confusion-matrix-and-metrics',
+    type: 'calculation',
+    difficulty: 'Exam-Level',
+    question:
+      'In a medical test of 1000 patients, 10 patients actually have cancer. A model diagnoses 20 patients as positive: 8 of them truly have cancer (TP = 8), while 12 are healthy (FP = 12). What is the model\'s Recall (Sensitivity)?',
+    options: [
+      '0.40 (40%)',
+      '0.80 (80%)',
+      '0.99 (99%)',
+      '0.08 (8%)',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 10 (Slide 51-54): Total actual positive cases = 10. The model caught 8 (TP = 8) and missed 2 (FN = 2). Recall = TP / (TP + FN) = 8 / (8 + 2) = 8 / 10 = 0.80 (80.0%).',
+    slideRef: { lessonId: 'lesson-10', slideNumber: 52 },
+    hints: [
+      'Recall is TP / (total actual positives).',
+      'Total sick people is 10; TP is 8.',
+    ],
+  },
+  {
+    id: 'q35',
+    lessonId: 'lesson-10',
+    chapterId: 'classification-metrics-formulas',
+    type: 'multiple-choice',
+    difficulty: 'Exam-Level',
+    question:
+      'What is the "Accuracy Paradox" in machine learning, and why does it occur in highly imbalanced datasets?',
+    options: [
+      'A model with 100% accuracy cannot be saved to disk.',
+      'A trivial model predicting the majority class for all instances can achieve 99% accuracy on a dataset with 1% positives, despite having 0% recall and completely failing to detect any targets of interest.',
+      'Precision and Recall must always equal each other.',
+      'Accuracy decreases whenever more training data is provided.',
+    ],
+    correctAnswer: 1,
+    explanation:
+      'Lesson 10 (Slide 58): In severe class imbalance (e.g. rare fraud or disease), negative cases dominate the denominator (TP + TN) / Total. A dummy model predicting negative for everyone achieves very high accuracy while providing zero real-world utility.',
+    slideRef: { lessonId: 'lesson-10', slideNumber: 58 },
+    hints: [
+      'Imagine 999 healthy patients and 1 sick patient.',
+      'If the doctor tells everyone they are healthy, accuracy is 99.9%, but the sick patient is missed.',
+    ],
+  },
 ];

@@ -6,6 +6,7 @@ import {
   BarChart3,
   CheckCircle2,
   Gamepad2,
+  GraduationCap,
   X,
 } from 'lucide-react';
 import { useStudy } from '../../context/StudyContext';
@@ -13,6 +14,12 @@ import { LESSON_1_DATA } from '../../data/lesson1Data';
 import { LESSON_2_DATA } from '../../data/lesson2Data';
 import { LESSON_3_DATA } from '../../data/lesson3Data';
 import { LESSON_4_DATA } from '../../data/lesson4Data';
+import { LESSON_5_DATA } from '../../data/lesson5Data';
+import { LESSON_6_DATA } from '../../data/lesson6Data';
+import { LESSON_7_DATA } from '../../data/lesson7Data';
+import { LESSON_8_DATA } from '../../data/lesson8Data';
+import { LESSON_9_DATA } from '../../data/lesson9Data';
+import { LESSON_10_DATA } from '../../data/lesson10Data';
 
 interface SidebarProps {
   currentView: string;
@@ -32,7 +39,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const { progress } = useStudy();
-  const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA, LESSON_4_DATA];
+  const lessons = [
+    LESSON_1_DATA,
+    LESSON_2_DATA,
+    LESSON_3_DATA,
+    LESSON_4_DATA,
+    LESSON_5_DATA,
+    LESSON_6_DATA,
+    LESSON_7_DATA,
+    LESSON_8_DATA,
+    LESSON_9_DATA,
+    LESSON_10_DATA,
+  ];
 
   const handleItemClick = (view: string, lessonId?: string, sectionId?: string) => {
     onNavigate(view, lessonId, sectionId);
@@ -96,7 +114,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <HelpCircle size={15} />
-            <span>Exam Practice & Quizzes</span>
+            <span>Practice Drills</span>
+          </span>
+        </button>
+
+        <button
+          onClick={() => handleItemClick('exam')}
+          className={`sidebar-nav-item ${currentView === 'exam' ? 'active' : ''}`}
+          style={{ width: '100%', background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer' }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <GraduationCap size={15} color="var(--lab-accent-cyan)" />
+            <span>Exam Simulator</span>
+          </span>
+          <span className="badge badge-cyan font-mono" style={{ fontSize: '0.62rem' }}>
+            TEST
           </span>
         </button>
 

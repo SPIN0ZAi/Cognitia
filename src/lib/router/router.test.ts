@@ -31,6 +31,15 @@ assert(l3.view === 'lesson' && l3.lessonId === 'lesson-3', 'Parses "/lessons/les
 const l4 = parseLocation('/lessons/lesson-4', '');
 assert(l4.view === 'lesson' && l4.lessonId === 'lesson-4', 'Parses "/lessons/lesson-4"');
 
+const l5 = parseLocation('/lessons/lesson-5', '');
+assert(l5.view === 'lesson' && l5.lessonId === 'lesson-5', 'Parses "/lessons/lesson-5"');
+
+const l6 = parseLocation('/lessons/lesson-6', '');
+assert(l6.view === 'lesson' && l6.lessonId === 'lesson-6', 'Parses "/lessons/lesson-6"');
+
+const l10 = parseLocation('/lessons/lesson-10', '');
+assert(l10.view === 'lesson' && l10.lessonId === 'lesson-10', 'Parses "/lessons/lesson-10"');
+
 const lAlias = parseLocation('/lesson/2', '');
 assert(lAlias.view === 'lesson' && lAlias.lessonId === 'lesson-2', 'Parses alias "/lesson/2"');
 
