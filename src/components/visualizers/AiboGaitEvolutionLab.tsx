@@ -1,345 +1,509 @@
 import React, { useState, useEffect } from 'react';
+import {
+  Cpu,
+  Play,
+  Pause,
+  RotateCcw,
+  Sparkles,
+  ShieldCheck,
+  ShieldAlert,
+} from 'lucide-react';
 
 export const AiboGaitEvolutionLab: React.FC = () => {
-  // Gait parameters from Table 1 of UCLM paper (Alonso et al.)
-  const [pg, setPg] = useState<number>(65); // Step period in 0.008s units (65 = 0.52s)
-  const [hf, setHf] = useState<number>(120); // Front body height (mm)
-  const [hb, setHb] = useState<number>(115); // Rear body height (mm)
-  const [hdf, setHdf] = useState<number>(25); // Paw clearance front (mm)
-  const [hdb, setHdb] = useState<number>(20); // Paw clearance rear (mm)
+  // Gait parameters from Table 1 of UCLM paper (Alonso et al., 2005)
+  // PG: Step period (40 to 80 ticks)
+  // hF: Front body height (90 to 140 mm)
+  // hB: Rear body height (90 to 140 mm)
+  // hdF: Paw clearance front (10 to 45 mm)
+  // hdB: Paw clearance rear (10 to 45 mm)
+  const [pg, setPg] = useState<number>(60);
+  const [hf, setHf] = useState<number>(120);
+  const [hb, setHb] = useState<number>(118);
+  const [hdf, setHdf] = useState<number>(26);
+  const [hdb, setHdb] = useState<number>(24);
 
-  // Simulation animation state
+  // Animation & simulation state
   const [isWalking, setIsWalking] = useState<boolean>(true);
-  const [legPhase, setLegPhase] = useState<number>(0);
-  const [testResult, setTestResult] = useState<{
-    distance: number;
-    time: number;
-    realSpeed: number;
+  const [gaitPhase, setGaitPhase] = useState<number>(0);
+  const [trackPosition, setTrackPosition] = useState<number>(0);
+  const [evaluatedResult, setEvaluatedResult] = useState<{
     surrogateSpeed: number;
     tier: 'Buena' | 'Regular' | 'Mala';
-    evaluatedOnRobot: boolean;
+    evaluatedOnPhysicalRobot: boolean;
     reason: string;
+    physicalSpeed?: number;
   } | null>(null);
 
-  // Animate quadruped walking legs
+  // GA Auto-Evolve state
+  const [gaGeneration, setGaGeneration] = useState<number>(0);
+  const [isEvolving, setIsEvolving] = useState<boolean>(false);
+  const [bestGaitFound, setBestGaitFound] = useState<{ speed: number; params: number[] }>({
+    speed: 28.4,
+    params: [60, 120, 118, 26, 24],
+  });
+
+  // Animate robot legs walking
   useEffect(() => {
+    let animId: ReturnType<typeof setInterval>;
     if (isWalking) {
-      const stepInterval = (pg * 8) / 20; // Animation speed proportional to step period PG
-      const timer = setInterval(() => {
-        setLegPhase((p) => (p + 1) % 360);
-      }, Math.max(20, stepInterval));
-      return () => clearInterval(timer);
+      const interval = Math.max(25, (pg * 8) / 16);
+      animId = setInterval(() => {
+        setGaitPhase((p) => (p + 12) % 360);
+        setTrackPosition((pos) => (pos + 1.2) % 100);
+      }, interval);
     }
+    return () => clearInterval(animId);
   }, [isWalking, pg]);
 
-  // Model-based surrogate speed calculation (ML regression surrogate)
-  const computeSurrogate = () => {
-    // Ground physics surrogate formula approximating the empirical gait dynamics:
-    // optimal PG is around 55-65; balanced body height hf ~ hb; clearance ~ 25mm
-    const periodSec = pg * 0.008;
-    const strideFreq = 1 / periodSec;
-    const bodyTilt = Math.abs(hf - hb);
-    const clearancePenalty = Math.max(0, 15 - hdf) * 0.3 + Math.max(0, 15 - hdb) * 0.3;
+  // Compute ML Surrogate evaluation
+  const evaluateGaitModel = (p: { pg: number; hf: number; hb: number; hdf: number; hdb: number }) => {
+    // Stride frequency is inversely proportional to PG
+    const periodSec = p.pg * 0.008;
+    const strideFreq = 1 / Math.max(0.2, periodSec);
 
-    let baseSpeed = 16 * strideFreq - bodyTilt * 0.3 - clearancePenalty;
-    baseSpeed = Math.max(4.0, Math.min(36.0, baseSpeed));
+    // Tilt penalty when front and rear heights diverge
+    const tiltPenalty = Math.abs(p.hf - p.hb) * 0.35;
+
+    // Clearance penalty when paws drag or lift unnecessarily high
+    const clearancePenalty =
+      Math.abs(p.hdf - 26) * 0.3 + Math.abs(p.hdb - 24) * 0.3;
+
+    // Base physics speed curve
+    let rawSpeed = 16.5 * strideFreq - tiltPenalty - clearancePenalty;
+    rawSpeed = Math.max(4.0, Math.min(35.5, rawSpeed));
+    const surrogateSpeed = parseFloat(rawSpeed.toFixed(1));
 
     let tier: 'Buena' | 'Regular' | 'Mala';
-    if (baseSpeed >= 28) tier = 'Buena';
-    else if (baseSpeed >= 20) tier = 'Regular';
+    if (surrogateSpeed >= 28.0) tier = 'Buena';
+    else if (surrogateSpeed >= 20.0) tier = 'Regular';
     else tier = 'Mala';
 
-    return { surrogateSpeed: parseFloat(baseSpeed.toFixed(1)), tier };
+    return { surrogateSpeed, tier };
   };
 
   const handleRunEvaluation = () => {
-    const { surrogateSpeed, tier } = computeSurrogate();
-
-    // UCLM Probabilistic Gate: α1 = 0.9, α2 = 0.5, α3 = 0.1
+    const { surrogateSpeed, tier } = evaluateGaitModel({ pg, hf, hb, hdf, hdb });
     const roll = Math.random();
     let willEvaluate = false;
     let reason = '';
 
-    if (tier === 'Buena' && roll <= 0.9) {
+    if (tier === 'Buena' && roll <= 0.90) {
       willEvaluate = true;
-      reason = `ML Surrogate rated BUENA (${surrogateSpeed} cm/s). Roll ${roll.toFixed(2)} <= α₁ (0.90) → Physical Track Test Executed!`;
+      reason = `ML Surrogate rated BUENA (${surrogateSpeed} cm/s). Roll ${roll.toFixed(2)} <= α₁ (0.90) → Physical Track Trial Approved!`;
     } else if (tier === 'Regular' && roll <= 0.45) {
       willEvaluate = true;
-      reason = `ML Surrogate rated REGULAR (${surrogateSpeed} cm/s). Roll ${roll.toFixed(2)} <= α₂ (0.45) → Physical Track Test Executed!`;
+      reason = `ML Surrogate rated REGULAR (${surrogateSpeed} cm/s). Roll ${roll.toFixed(2)} <= α₂ (0.45) → Physical Trial Approved.`;
     } else if (tier === 'Mala' && roll <= 0.08) {
       willEvaluate = true;
-      reason = `ML Surrogate rated MALA (${surrogateSpeed} cm/s). Low probability exploratory evaluation (roll ${roll.toFixed(2)} <= α₃ (0.08)).`;
+      reason = `ML Surrogate rated MALA (${surrogateSpeed} cm/s). Low-probability exploratory physical evaluation (roll ${roll.toFixed(2)} <= α₃ (0.08)).`;
     } else {
       willEvaluate = false;
-      reason = `FILTERED OUT BY ML SURROGATE! Candidate predicted as ${tier} (${surrogateSpeed} cm/s). Physical run avoided, saving 30s robot motor wear.`;
+      reason = `FILTERED OUT BY ML SURROGATE! Candidate predicted as ${tier} (${surrogateSpeed} cm/s). Physical run avoided, saving robot motor wear.`;
     }
 
-    // If evaluated on robot, add physical noise
-    let realSpeed = surrogateSpeed;
-    let distance = 0;
-    if (willEvaluate) {
-      const noise = (Math.random() - 0.5) * 2.4; // Carpet sensor noise
-      realSpeed = parseFloat(Math.max(2.0, surrogateSpeed + noise).toFixed(1));
-      distance = parseFloat((realSpeed * 30).toFixed(1)); // 30s run
-    } else {
-      distance = parseFloat((surrogateSpeed * 30).toFixed(1));
-    }
+    const noise = willEvaluate ? (Math.random() - 0.5) * 1.8 : 0;
+    const physicalSpeed = willEvaluate ? parseFloat((surrogateSpeed + noise).toFixed(1)) : undefined;
 
-    setTestResult({
-      distance,
-      time: 30,
-      realSpeed,
+    setEvaluatedResult({
       surrogateSpeed,
       tier,
-      evaluatedOnRobot: willEvaluate,
+      evaluatedOnPhysicalRobot: willEvaluate,
       reason,
+      physicalSpeed,
     });
   };
 
-  const { surrogateSpeed, tier } = computeSurrogate();
+  // Run a quick 5-generation GA optimization
+  const runQuickGA = () => {
+    setIsEvolving(true);
+    let bestSpeed = bestGaitFound.speed;
+    let bestParams = [...bestGaitFound.params];
 
-  // Leg joint angles based on sine phases
-  const rad = (legPhase * Math.PI) / 180;
-  const legFL = Math.sin(rad) * 24;
-  const legFR = Math.sin(rad + Math.PI) * 24;
-  const legRL = Math.sin(rad + Math.PI * 0.5) * 22;
-  const legRR = Math.sin(rad + Math.PI * 1.5) * 22;
+    for (let gen = 1; gen <= 10; gen++) {
+      // Perturb parameters around optimal region
+      const testPg = Math.min(75, Math.max(45, Math.round(58 + (Math.random() - 0.5) * 12)));
+      const testHf = Math.min(135, Math.max(105, Math.round(120 + (Math.random() - 0.5) * 10)));
+      const testHb = Math.min(135, Math.max(105, Math.round(testHf + (Math.random() - 0.5) * 6)));
+      const testHdf = Math.min(35, Math.max(18, Math.round(26 + (Math.random() - 0.5) * 6)));
+      const testHdb = Math.min(35, Math.max(18, Math.round(24 + (Math.random() - 0.5) * 6)));
+
+      const { surrogateSpeed } = evaluateGaitModel({
+        pg: testPg,
+        hf: testHf,
+        hb: testHb,
+        hdf: testHdf,
+        hdb: testHdb,
+      });
+
+      if (surrogateSpeed > bestSpeed) {
+        bestSpeed = surrogateSpeed;
+        bestParams = [testPg, testHf, testHb, testHdf, testHdb];
+      }
+    }
+
+    setGaGeneration((prev) => prev + 10);
+    setBestGaitFound({ speed: bestSpeed, params: bestParams });
+    setPg(bestParams[0]);
+    setHf(bestParams[1]);
+    setHb(bestParams[2]);
+    setHdf(bestParams[3]);
+    setHdb(bestParams[4]);
+    setIsEvolving(false);
+  };
+
+  const currentEvaluation = evaluateGaitModel({ pg, hf, hb, hdf, hdb });
+
+  // Leg joint angles for SVG quadruped animation
+  const rad = (gaitPhase * Math.PI) / 180;
+  const frontLegAngle = Math.sin(rad) * 25;
+  const rearLegAngle = Math.sin(rad + Math.PI) * 25;
+  const bodyTiltAngle = ((hf - hb) / 50) * 12; // Incline tilt in degrees
 
   return (
-    <div className="bg-[#0f172a] border border-cyan-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+    <div className="visualizer-container">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              Published UCLM Research Laboratory
-            </span>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              Sony AIBO Quadruped Robot Locomotion Optimization
-            </h3>
+      <div className="visualizer-header">
+        <div className="visualizer-title-area">
+          <div className="visualizer-title">
+            <Cpu size={20} style={{ color: 'var(--lab-accent-amber)' }} />
+            Sony AIBO Quadruped Locomotion Optimization (UCLM Research Paper)
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Alonso, Gámez, García-Varea, Martínez (UCLM): GA parameter optimization with Machine Learning surrogate filtering.
-          </p>
+          <div className="visualizer-subtitle">
+            Alonso et al. (2005): Genetic Algorithms Combined with Machine Learning Surrogate Fitness Filtering
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleRunEvaluation}
-            className="px-4 py-2 rounded-lg text-sm font-bold bg-cyan-500 text-slate-950 hover:bg-cyan-400 shadow-lg shadow-cyan-500/20"
-          >
-            Evaluate Candidate
+        <div className="visualizer-controls">
+          <button onClick={() => setIsWalking(!isWalking)} className="btn-tactile btn-sm">
+            {isWalking ? <Pause size={14} /> : <Play size={14} />}
+            <span>{isWalking ? 'Pause Motion' : 'Walk'}</span>
+          </button>
+          <button onClick={handleRunEvaluation} className="btn-tactile btn-sm btn-primary">
+            <ShieldCheck size={14} />
+            <span>Evaluate Gait</span>
+          </button>
+          <button onClick={runQuickGA} disabled={isEvolving} className="btn-tactile btn-sm btn-emerald">
+            <Sparkles size={14} />
+            <span>Evolve with GA {gaGeneration > 0 ? `(Gen ${gaGeneration})` : '(+10 Gen)'}</span>
           </button>
           <button
-            onClick={() => setIsWalking(!isWalking)}
-            className="px-3.5 py-2 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700"
+            onClick={() => {
+              setPg(60);
+              setHf(120);
+              setHb(118);
+              setHdf(26);
+              setHdb(24);
+              setEvaluatedResult(null);
+            }}
+            className="btn-tactile btn-sm"
           >
-            {isWalking ? 'Pause Gait' : 'Animate Gait'}
+            <RotateCcw size={14} />
+            <span>Default</span>
           </button>
         </div>
       </div>
 
-      {/* Robot Animated Canvas & Live Kinematics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Robot Kinematics SVG */}
-        <div className="bg-slate-950 p-6 rounded-xl border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden">
-          <div className="text-xs text-slate-400 mb-2 w-full flex justify-between font-mono">
-            <span>AIBO Kinematic Gait Profile</span>
-            <span className="text-cyan-400">Step Period: {(pg * 0.008).toFixed(3)}s</span>
-          </div>
-
-          <div className="h-48 w-full flex items-center justify-center">
-            <svg viewBox="0 0 320 180" className="w-full max-w-[280px]">
-              {/* Floor line */}
-              <line x1="20" y1="160" x2="300" y2="160" stroke="#334155" strokeWidth="2" />
-              {/* Carpet surface dots */}
-              <line x1="20" y1="162" x2="300" y2="162" stroke="#475569" strokeDasharray="3,4" strokeWidth="1" />
-
-              {/* Back Legs (Darker) */}
-              {/* Rear Right Leg */}
-              <line x1="80" y1={160 - hb} x2={80 + legRR * 0.8} y2="160" stroke="#475569" strokeWidth="6" strokeLinecap="round" />
-              {/* Front Right Leg */}
-              <line x1="220" y1={160 - hf} x2={220 + legFR * 0.8} y2="160" stroke="#475569" strokeWidth="6" strokeLinecap="round" />
-
-              {/* Robot Body Torso */}
-              <polygon
-                points={`60,${160 - hb + 10} 240,${160 - hf + 10} 230,${160 - hf - 20} 70,${160 - hb - 20}`}
-                fill="#1e293b"
-                stroke="#38bdf8"
-                strokeWidth="2.5"
-                rx="8"
-              />
-
-              {/* Robot Head */}
-              <circle cx="255" cy={160 - hf - 15} r="16" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
-              {/* Eye sensor visor */}
-              <rect x="258" y={160 - hf - 20} width="10" height="6" rx="2" fill="#06b6d4" className="animate-pulse" />
-
-              {/* Robot Tail */}
-              <line x1="60" y1={160 - hb - 10} x2="40" y2={160 - hb - 30} stroke="#38bdf8" strokeWidth="3" strokeLinecap="round" />
-
-              {/* Front Legs (Lighter / Foreground) */}
-              {/* Rear Left Leg */}
-              <line x1="85" y1={160 - hb} x2={85 + legRL * 0.8} y2="160" stroke="#0ea5e9" strokeWidth="6" strokeLinecap="round" />
-              {/* Front Left Leg */}
-              <line x1="225" y1={160 - hf} x2={225 + legFL * 0.8} y2="160" stroke="#38bdf8" strokeWidth="6" strokeLinecap="round" />
-            </svg>
-          </div>
-
-          <div className="w-full flex justify-between text-[11px] font-mono text-slate-500 mt-2">
-            <span>Rear Height: {hb}mm</span>
-            <span>Front Height: {hf}mm</span>
-          </div>
-        </div>
-
-        {/* Surrogate Prediction & Evaluation Box */}
-        <div className="space-y-4">
-          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-300">ML Surrogate Estimation</span>
-              <span
-                className={`px-2.5 py-0.5 rounded text-xs font-bold ${
-                  tier === 'Buena'
-                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                    : tier === 'Regular'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                    : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                }`}
-              >
-                {tier.toUpperCase()} TIER
+      <div className="visualizer-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Quadruped SVG Simulation Canvas & Virtual 10m Track */}
+        <div
+          style={{
+            background: 'var(--lab-bg-obsidian)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--lab-border-active)',
+            padding: '1.25rem',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Top telemetry strip */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="badge badge-amber font-mono">Sony AIBO ERS-7</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Chromosome: [PG={pg}, hF={hf}, hB={hb}, hdF={hdf}, hdB={hdb}]
               </span>
             </div>
 
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-mono font-bold text-white">{surrogateSpeed}</span>
-              <span className="text-xs text-slate-400 font-mono">cm / s (predicted)</span>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed">
-              Based on UCLM trained decision model: High step frequency (PG={pg}) combined with balanced stance (|hF - hB|={Math.abs(hf - hb)} mm) produces high-speed locomotion.
-            </p>
-          </div>
-
-          {/* Result of Evaluation Button */}
-          {testResult && (
-            <div
-              className={`p-4 rounded-xl border text-xs leading-relaxed ${
-                testResult.evaluatedOnRobot
-                  ? 'bg-cyan-950/30 border-cyan-500/30 text-cyan-200'
-                  : 'bg-slate-900 border-slate-800 text-slate-300'
-              }`}
-            >
-              <div className="font-bold mb-1 flex items-center justify-between">
-                <span>{testResult.evaluatedOnRobot ? 'Physical Robot Run Complete' : 'Robot Evaluation Skipped'}</span>
-                {testResult.evaluatedOnRobot && (
-                  <span className="font-mono text-emerald-400">Measured: {testResult.realSpeed} cm/s</span>
-                )}
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Predicted Speed: </span>
+                <strong className="font-mono" style={{ color: 'var(--lab-accent-lime)' }}>
+                  {currentEvaluation.surrogateSpeed} cm/s
+                </strong>
               </div>
-              <p className="text-[11px] text-slate-400">{testResult.reason}</p>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>ML Tier: </span>
+                <span
+                  className="badge font-mono"
+                  style={{
+                    background:
+                      currentEvaluation.tier === 'Buena'
+                        ? 'rgba(16, 185, 129, 0.2)'
+                        : currentEvaluation.tier === 'Regular'
+                        ? 'rgba(245, 158, 11, 0.2)'
+                        : 'rgba(239, 68, 68, 0.2)',
+                    color:
+                      currentEvaluation.tier === 'Buena'
+                        ? 'var(--accent-emerald)'
+                        : currentEvaluation.tier === 'Regular'
+                        ? 'var(--accent-amber)'
+                        : 'var(--accent-rose)',
+                  }}
+                >
+                  {currentEvaluation.tier}
+                </span>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Parameter Sliders Grid (Table 1 of Paper) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800/80">
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Step Period (PG):</span>
-            <span className="font-mono text-cyan-400">{pg} ({(pg * 0.008).toFixed(3)}s)</span>
           </div>
-          <input
-            type="range"
-            min="40"
-            max="90"
-            step="1"
-            value={pg}
-            onChange={(e) => setPg(parseInt(e.target.value))}
-            className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
+
+          {/* Articulated Quadruped SVG Robot Animation */}
+          <div style={{ width: '100%', height: '170px', position: 'relative' }}>
+            <svg viewBox="0 0 600 170" style={{ width: '100%', height: '100%' }}>
+              {/* Floor grid line with 10cm tick marks */}
+              <line x1="0" y1="140" x2="600" y2="140" stroke="rgba(255, 255, 255, 0.2)" strokeWidth="2" />
+              {Array.from({ length: 15 }, (_, i) => {
+                const tickX = ((i * 40 + trackPosition * 4) % 600);
+                return (
+                  <g key={i}>
+                    <line x1={tickX} y1="140" x2={tickX} y2="148" stroke="rgba(255, 255, 255, 0.3)" />
+                    <text x={tickX - 8} y="160" fill="var(--text-muted)" fontSize="8" fontFamily="monospace">
+                      {(i * 10)}cm
+                    </text>
+                  </g>
+                );
+              })}
+
+              {/* Robot Quadruped Center Group */}
+              <g transform={`translate(280, ${100 - (hf - 120) * 0.4}) rotate(${bodyTiltAngle}, 0, 0)`}>
+                {/* Rear Leg Pair (darker shade for depth) */}
+                <g transform="translate(-45, 10)">
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2={Math.sin(((rearLegAngle + 180) * Math.PI) / 180) * 28}
+                    y2={30}
+                    stroke="#475569"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="0" cy="0" r="4" fill="#64748b" />
+                </g>
+
+                {/* Front Leg Pair (darker shade for depth) */}
+                <g transform="translate(45, 10)">
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2={Math.sin(((frontLegAngle + 180) * Math.PI) / 180) * 28}
+                    y2={30}
+                    stroke="#475569"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="0" cy="0" r="4" fill="#64748b" />
+                </g>
+
+                {/* Robot Main Body Torso */}
+                <rect
+                  x="-55"
+                  y="-12"
+                  width="110"
+                  height="26"
+                  rx="8"
+                  fill="#1e293b"
+                  stroke="var(--lab-accent-cyan)"
+                  strokeWidth="2"
+                />
+
+                {/* Head & Neck */}
+                <path d="M 45 -8 L 65 -25 L 85 -20 L 75 -5 Z" fill="#334155" stroke="var(--lab-accent-cyan)" strokeWidth="1.5" />
+                {/* Glowing LED Eye */}
+                <circle cx="76" cy="-18" r="3" fill="var(--lab-accent-lime)" />
+
+                {/* Front Leg (Forefront) */}
+                <g transform="translate(40, 10)">
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2={Math.sin((frontLegAngle * Math.PI) / 180) * 32}
+                    y2={30 + (hdf - 26) * 0.3}
+                    stroke="var(--lab-accent-cyan)"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="0" cy="0" r="5" fill="#38bdf8" />
+                  <ellipse
+                    cx={Math.sin((frontLegAngle * Math.PI) / 180) * 32}
+                    cy={30 + (hdf - 26) * 0.3}
+                    rx="6"
+                    ry="3"
+                    fill="var(--lab-accent-lime)"
+                  />
+                </g>
+
+                {/* Rear Leg (Forefront) */}
+                <g transform="translate(-40, 10)">
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2={Math.sin((rearLegAngle * Math.PI) / 180) * 32}
+                    y2={30 + (hdb - 24) * 0.3}
+                    stroke="var(--lab-accent-cyan)"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                  />
+                  <circle cx="0" cy="0" r="5" fill="#38bdf8" />
+                  <ellipse
+                    cx={Math.sin((rearLegAngle * Math.PI) / 180) * 32}
+                    cy={30 + (hdb - 24) * 0.3}
+                    rx="6"
+                    ry="3"
+                    fill="var(--lab-accent-lime)"
+                  />
+                </g>
+              </g>
+            </svg>
+          </div>
         </div>
 
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Front Height (hF):</span>
-            <span className="font-mono text-cyan-400">{hf} mm</span>
+        {/* 5-Parameter Interactive Chromosome Controls */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '1rem',
+            background: 'var(--lab-bg-surface)',
+            padding: '1.25rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+          }}
+        >
+          {/* PG */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>PG (Step Period):</span>
+              <strong className="font-mono text-cyan-400">{pg} ticks ({(pg * 0.008).toFixed(2)}s)</strong>
+            </div>
+            <input
+              type="range"
+              min="40"
+              max="80"
+              value={pg}
+              onChange={(e) => setPg(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--lab-accent-cyan)' }}
+            />
           </div>
-          <input
-            type="range"
-            min="100"
-            max="140"
-            step="1"
-            value={hf}
-            onChange={(e) => setHf(parseInt(e.target.value))}
-            className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
+
+          {/* hF */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>hF (Front Height):</span>
+              <strong className="font-mono text-lime-400">{hf} mm</strong>
+            </div>
+            <input
+              type="range"
+              min="90"
+              max="140"
+              value={hf}
+              onChange={(e) => setHf(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--lab-accent-lime)' }}
+            />
+          </div>
+
+          {/* hB */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>hB (Rear Height):</span>
+              <strong className="font-mono text-lime-400">{hb} mm</strong>
+            </div>
+            <input
+              type="range"
+              min="90"
+              max="140"
+              value={hb}
+              onChange={(e) => setHb(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--lab-accent-lime)' }}
+            />
+          </div>
+
+          {/* hdF */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>hdF (Front Paw Lift):</span>
+              <strong className="font-mono text-amber-400">{hdf} mm</strong>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="45"
+              value={hdf}
+              onChange={(e) => setHdf(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--lab-accent-amber)' }}
+            />
+          </div>
+
+          {/* hdB */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.2rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>hdB (Rear Paw Lift):</span>
+              <strong className="font-mono text-amber-400">{hdb} mm</strong>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="45"
+              value={hdb}
+              onChange={(e) => setHdb(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--lab-accent-amber)' }}
+            />
+          </div>
         </div>
 
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Rear Height (hB):</span>
-            <span className="font-mono text-cyan-400">{hb} mm</span>
-          </div>
-          <input
-            type="range"
-            min="100"
-            max="140"
-            step="1"
-            value={hb}
-            onChange={(e) => setHb(parseInt(e.target.value))}
-            className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
-        </div>
+        {/* Evaluation Result / Surrogate Filter Card */}
+        {evaluatedResult && (
+          <div
+            className="card"
+            style={{
+              padding: '1.25rem',
+              border: evaluatedResult.evaluatedOnPhysicalRobot
+                ? '1px solid var(--lab-accent-lime)'
+                : '1px solid var(--accent-rose)',
+              background: evaluatedResult.evaluatedOnPhysicalRobot
+                ? 'rgba(16, 185, 129, 0.05)'
+                : 'rgba(239, 68, 68, 0.05)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              {evaluatedResult.evaluatedOnPhysicalRobot ? (
+                <ShieldCheck size={18} color="var(--lab-accent-lime)" />
+              ) : (
+                <ShieldAlert size={18} color="var(--accent-rose)" />
+              )}
+              <strong style={{ fontSize: '0.85rem' }}>
+                {evaluatedResult.evaluatedOnPhysicalRobot
+                  ? 'Physical Track Evaluation Approved'
+                  : 'Filtered Out by ML Surrogate Filter (Saved Hardware Wear)'}
+              </strong>
+            </div>
 
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Front Paw Lift (hdF):</span>
-            <span className="font-mono text-slate-300">{hdf} mm</span>
-          </div>
-          <input
-            type="range"
-            min="10"
-            max="40"
-            step="1"
-            value={hdf}
-            onChange={(e) => setHdf(parseInt(e.target.value))}
-            className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
-        </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+              {evaluatedResult.reason}
+            </p>
 
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Rear Paw Lift (hdB):</span>
-            <span className="font-mono text-slate-300">{hdb} mm</span>
+            <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.75rem', flexWrap: 'wrap' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>ML Surrogate Speed: </span>
+                <strong className="font-mono text-cyan-400">{evaluatedResult.surrogateSpeed} cm/s</strong>
+              </div>
+              {evaluatedResult.physicalSpeed && (
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Robot Optical Sensor Speed: </span>
+                  <strong className="font-mono text-emerald-400">{evaluatedResult.physicalSpeed} cm/s</strong>
+                </div>
+              )}
+            </div>
           </div>
-          <input
-            type="range"
-            min="10"
-            max="40"
-            step="1"
-            value={hdb}
-            onChange={(e) => setHdb(parseInt(e.target.value))}
-            className="w-full accent-cyan-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs font-medium text-slate-400 block mb-1">Presets</label>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => { setPg(55); setHf(120); setHb(120); setHdf(25); setHdb(25); }}
-              className="flex-1 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-semibold"
-            >
-              Optimal Trot (Fast)
-            </button>
-            <button
-              onClick={() => { setPg(85); setHf(140); setHb(100); setHdf(12); setHdb(12); }}
-              className="flex-1 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 font-semibold"
-            >
-              Unbalanced (Mala)
-            </button>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

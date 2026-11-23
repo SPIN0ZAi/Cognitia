@@ -1,256 +1,489 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import {
+  Crosshair,
+  HelpCircle,
+} from 'lucide-react';
 
 interface Point2D {
   id: string;
-  x: number;
-  y: number;
+  x: number; // 0 to 10
+  y: number; // 0 to 8
   label: 'Red' | 'Blue';
 }
 
+type DistanceMetric = 'euclidean' | 'manhattan' | 'chebyshev';
+
 export const KNNClassifierLab: React.FC = () => {
-  // Initial points from Slide 12 Proposed Exercise 1
-  const [points, setPoints] = useState<Point2D[]>([
-    { id: 'A', x: 1, y: 2, label: 'Red' },
-    { id: 'B', x: 2, y: 3, label: 'Red' },
-    { id: 'C', x: 5, y: 5, label: 'Blue' },
-    { id: 'D', x: 6, y: 4, label: 'Blue' },
-    { id: 'E', x: 3, y: 2, label: 'Red' },
-  ]);
+  // Slide 12 UCLM Exam Points by default
+  const defaultPoints: Point2D[] = [
+    { id: 'A', x: 1.5, y: 2.0, label: 'Red' },
+    { id: 'B', x: 2.2, y: 3.2, label: 'Red' },
+    { id: 'C', x: 3.0, y: 1.8, label: 'Red' },
+    { id: 'D', x: 3.8, y: 3.0, label: 'Red' },
+    { id: 'E', x: 2.8, y: 4.5, label: 'Red' },
+    { id: 'F', x: 6.0, y: 5.5, label: 'Blue' },
+    { id: 'G', x: 7.2, y: 4.8, label: 'Blue' },
+    { id: 'H', x: 8.0, y: 6.2, label: 'Blue' },
+    { id: 'I', x: 6.8, y: 7.0, label: 'Blue' },
+    { id: 'J', x: 5.5, y: 3.8, label: 'Blue' },
+  ];
 
-  const [queryPoint, setQueryPoint] = useState<{ x: number; y: number }>({ x: 3, y: 4 });
+  const [points, setPoints] = useState<Point2D[]>(defaultPoints);
+  const [queryPoint, setQueryPoint] = useState<{ x: number; y: number }>({ x: 4.5, y: 4.0 });
   const [k, setK] = useState<number>(3);
-  const [metric, setMetric] = useState<'euclidean' | 'manhattan'>('euclidean');
-  const [pointToAddLabel, setPointToAddLabel] = useState<'Red' | 'Blue'>('Blue');
+  const [metric, setMetric] = useState<DistanceMetric>('euclidean');
+  const [weightedVoting, setWeightedVoting] = useState<boolean>(false);
+  const [newPointClass, setNewPointClass] = useState<'Red' | 'Blue'>('Red');
+  const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
 
-  // Compute distance from query point to each training point
-  const distances = points.map((pt) => {
-    let d = 0;
-    if (metric === 'euclidean') {
-      d = Math.sqrt(Math.pow(pt.x - queryPoint.x, 2) + Math.pow(pt.y - queryPoint.y, 2));
-    } else {
-      d = Math.abs(pt.x - queryPoint.x) + Math.abs(pt.y - queryPoint.y);
+  // Compute distance function
+  const calcDist = (x1: number, y1: number, x2: number, y2: number): number => {
+    if (metric === 'manhattan') {
+      return Math.abs(x1 - x2) + Math.abs(y1 - y2);
     }
-    return { ...pt, distance: d };
-  });
+    if (metric === 'chebyshev') {
+      return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2));
+    }
+    return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+  };
 
-  // Sort ascending by distance
-  const sorted = [...distances].sort((a, b) => a.distance - b.distance);
-  const neighbors = sorted.slice(0, Math.min(k, sorted.length));
+  // Predict class for any arbitrary coordinate (x, y)
+  const classifyPoint = (
+    qx: number,
+    qy: number,
+    ptList: Point2D[],
+    kVal: number,
+    isWeighted: boolean
+  ): { label: 'Red' | 'Blue' | 'Tie'; redScore: number; blueScore: number; radius: number } => {
+    if (ptList.length === 0) return { label: 'Tie', redScore: 0, blueScore: 0, radius: 0 };
 
-  // Count votes
-  const redVotes = neighbors.filter((n) => n.label === 'Red').length;
-  const blueVotes = neighbors.filter((n) => n.label === 'Blue').length;
-  const predictedLabel = redVotes > blueVotes ? 'Red' : blueVotes > redVotes ? 'Blue' : 'Tie';
-  const radius = neighbors.length > 0 ? neighbors[neighbors.length - 1].distance : 0;
+    const withDist = ptList.map((pt) => ({
+      ...pt,
+      dist: Math.max(0.001, calcDist(qx, qy, pt.x, pt.y)),
+    }));
+    withDist.sort((a, b) => a.dist - b.dist);
 
+    const neighbors = withDist.slice(0, Math.min(kVal, withDist.length));
+    const radius = neighbors[neighbors.length - 1].dist;
+
+    let redScore = 0;
+    let blueScore = 0;
+
+    neighbors.forEach((n) => {
+      const weight = isWeighted ? 1.0 / (n.dist * n.dist) : 1.0;
+      if (n.label === 'Red') redScore += weight;
+      else blueScore += weight;
+    });
+
+    let label: 'Red' | 'Blue' | 'Tie' = 'Tie';
+    if (redScore > blueScore) label = 'Red';
+    else if (blueScore > redScore) label = 'Blue';
+
+    return { label, redScore, blueScore, radius };
+  };
+
+  // Query prediction
+  const queryResult = useMemo(() => {
+    return classifyPoint(queryPoint.x, queryPoint.y, points, k, weightedVoting);
+  }, [queryPoint, points, k, metric, weightedVoting]);
+
+  // Neighbors for the query point
+  const queryNeighbors = useMemo(() => {
+    const withDist = points.map((pt) => ({
+      ...pt,
+      dist: calcDist(queryPoint.x, queryPoint.y, pt.x, pt.y),
+    }));
+    withDist.sort((a, b) => a.dist - b.dist);
+    return withDist.slice(0, Math.min(k, withDist.length));
+  }, [queryPoint, points, k, metric]);
+
+  // Generate 2D Decision Boundary Background Mesh
+  const heatmapMesh = useMemo(() => {
+    if (!showHeatmap || points.length === 0) return [];
+    const cols = 28;
+    const rows = 20;
+    const cells: { x: number; y: number; label: string }[] = [];
+
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) {
+        const x = (c / (cols - 1)) * 10;
+        const y = (r / (rows - 1)) * 8;
+        const res = classifyPoint(x, y, points, k, weightedVoting);
+        cells.push({ x, y, label: res.label });
+      }
+    }
+    return cells;
+  }, [points, k, metric, weightedVoting, showHeatmap]);
+
+  // SVG dimensions
+  const svgW = 540;
+  const svgH = 260;
+  const margin = { top: 20, right: 30, bottom: 35, left: 40 };
+  const plotW = svgW - margin.left - margin.right;
+  const plotH = svgH - margin.top - margin.bottom;
+
+  const toPx = (x: number) => margin.left + (x / 10) * plotW;
+  const toPy = (y: number) => margin.top + plotH - (y / 8) * plotH;
+
+  const toCoordX = (px: number) => Math.max(0, Math.min(10, ((px - margin.left) / plotW) * 10));
+  const toCoordY = (py: number) => Math.max(0, Math.min(8, ((margin.top + plotH - py) / plotH) * 8));
+
+  // Canvas click to move query point or add sample
   const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    // SVG viewBox is 0 0 400 360, margins: left 40, right 360, top 20, bottom 320
-    const coordX = Math.round(Math.max(0, Math.min(8, ((clickX - 40) / 320) * 8)) * 10) / 10;
-    const coordY = Math.round(Math.max(0, Math.min(7, (1 - (clickY - 20) / 300) * 7)) * 10) / 10;
+    if (
+      clickX >= margin.left &&
+      clickX <= margin.left + plotW &&
+      clickY >= margin.top &&
+      clickY <= margin.top + plotH
+    ) {
+      const cx = parseFloat(toCoordX(clickX).toFixed(2));
+      const cy = parseFloat(toCoordY(clickY).toFixed(2));
 
-    setQueryPoint({ x: coordX, y: coordY });
+      if (e.shiftKey) {
+        // Add new sample point
+        setPoints((prev) => [
+          ...prev,
+          {
+            id: `p-${Date.now()}`,
+            x: cx,
+            y: cy,
+            label: newPointClass,
+          },
+        ]);
+      } else {
+        // Move query point
+        setQueryPoint({ x: cx, y: cy });
+      }
+    }
   };
 
-  const handleAddTrainingPoint = () => {
-    const newId = String.fromCharCode(65 + points.length);
-    setPoints((prev) => [
-      ...prev,
-      {
-        id: newId,
-        x: queryPoint.x,
-        y: queryPoint.y,
-        label: pointToAddLabel,
-      },
-    ]);
+  // Preset loaders
+  const loadPreset = (presetName: string) => {
+    if (presetName === 'exam') {
+      setPoints(defaultPoints);
+      setQueryPoint({ x: 4.5, y: 4.0 });
+      setK(3);
+    } else if (presetName === 'concentric') {
+      // Concentric circles (where linear models fail, but k-NN succeeds!)
+      const pts: Point2D[] = [];
+      // Inner circle Red
+      for (let i = 0; i < 14; i++) {
+        const a = (i / 14) * 2 * Math.PI;
+        pts.push({ id: `c1-${i}`, x: 5 + Math.cos(a) * 1.5, y: 4 + Math.sin(a) * 1.2, label: 'Red' });
+      }
+      // Outer ring Blue
+      for (let i = 0; i < 22; i++) {
+        const a = (i / 22) * 2 * Math.PI;
+        pts.push({ id: `c2-${i}`, x: 5 + Math.cos(a) * 3.4, y: 4 + Math.sin(a) * 2.8, label: 'Blue' });
+      }
+      setPoints(pts);
+      setQueryPoint({ x: 5, y: 4 });
+      setK(3);
+    } else if (presetName === 'outlier') {
+      // Linearly separable with an intruder outlier
+      const pts: Point2D[] = [
+        ...defaultPoints,
+        { id: 'intruder', x: 2.5, y: 2.5, label: 'Blue' }, // Blue deep in Red territory!
+      ];
+      setPoints(pts);
+      setQueryPoint({ x: 2.8, y: 2.7 });
+      setK(1);
+    }
   };
 
   return (
-    <div className="bg-[#0f172a] border border-cyan-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+    <div className="visualizer-container">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              Interactive Laboratory 10.1
-            </span>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              k-Nearest Neighbors (k-NN) Visual Classifier
-            </h3>
+      <div className="visualizer-header">
+        <div className="visualizer-title-area">
+          <div className="visualizer-title">
+            <Crosshair size={20} style={{ color: 'var(--lab-accent-cyan)' }} />
+            k-Nearest Neighbors (k-NN) Visual Classifier Laboratory (Lesson 10, Slides 1–28)
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Slide 1–28: Click canvas to move query point Q(x, y). Adjust k and distance metric to observe neighbor voting.
-          </p>
+          <div className="visualizer-subtitle">
+            2D Decision Boundary Heatmap, Minkowski Distance Metrics & Distance-Weighted Voting Dynamics
+          </div>
         </div>
 
-        {/* Prediction Status Pill */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400 font-mono">Predicted Class:</span>
-          <span
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${
-              predictedLabel === 'Red'
-                ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                : predictedLabel === 'Blue'
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-            }`}
-          >
-            {predictedLabel.toUpperCase()} ({predictedLabel === 'Red' ? redVotes : blueVotes}/{neighbors.length} votes)
-          </span>
+        <div className="visualizer-controls">
+          <button onClick={() => loadPreset('exam')} className="btn-tactile btn-sm">
+            <span>UCLM Exam Preset</span>
+          </button>
+          <button onClick={() => loadPreset('concentric')} className="btn-tactile btn-sm btn-primary">
+            <span>Concentric Circles</span>
+          </button>
+          <button onClick={() => loadPreset('outlier')} className="btn-tactile btn-sm btn-amber">
+            <span>Noisy Outlier Test</span>
+          </button>
         </div>
       </div>
 
-      {/* Hyperparameter Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800/80">
-        <div>
-          <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Neighborhood Size (k):</span>
-            <span className="font-mono text-cyan-400 font-bold">k = {k}</span>
+      <div className="visualizer-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* Hyperparameter Bar */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '1rem',
+            background: 'var(--lab-bg-surface)',
+            padding: '1rem 1.25rem',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+          }}
+        >
+          {/* k parameter */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Neighborhood Size (k):</span>
+              <strong className="font-mono text-cyan-400" style={{ fontSize: '0.9rem' }}>
+                k = {k} {k % 2 === 0 ? '(Even: Tie possible)' : '(Odd: Tie breaker)'}
+              </strong>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="15"
+              step="1"
+              value={k}
+              onChange={(e) => setK(parseInt(e.target.value, 10))}
+              style={{ width: '100%', accentColor: 'var(--lab-accent-cyan)' }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+              <span>k=1 (Sharp/Overfitting)</span>
+              <span>k=7 (Smooth)</span>
+              <span>k=15 (Global majority)</span>
+            </div>
           </div>
-          <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
-            {[1, 3, 5, 7].map((num) => (
+
+          {/* Metric selector */}
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+              Distance Metric:
+            </div>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {(
+                [
+                  { id: 'euclidean', label: 'Euclidean (L2)' },
+                  { id: 'manhattan', label: 'Manhattan (L1)' },
+                  { id: 'chebyshev', label: 'Chebyshev (L∞)' },
+                ] as const
+              ).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMetric(m.id)}
+                  className={`btn-tactile btn-xs ${metric === m.id ? 'btn-primary' : ''}`}
+                  style={{ flex: 1, padding: '0.35rem 0.2rem' }}
+                >
+                  {m.label.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Options: Weighted voting & Heatmap */}
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+              Advanced Modes:
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={weightedVoting}
+                  onChange={(e) => setWeightedVoting(e.target.checked)}
+                />
+                <span>Distance-Weighted Vote (w = 1/d²)</span>
+              </label>
+              <label style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showHeatmap}
+                  onChange={(e) => setShowHeatmap(e.target.checked)}
+                />
+                <span>Show Decision Boundary Heatmap</span>
+              </label>
+            </div>
+          </div>
+
+          {/* New Point Color Mode */}
+          <div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+              Shift+Click Adds Point:
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
               <button
-                key={num}
-                onClick={() => setK(num)}
-                className={`py-1 text-xs rounded font-medium ${
-                  k === num ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400'
-                }`}
+                onClick={() => setNewPointClass('Red')}
+                className={`btn-tactile btn-xs ${newPointClass === 'Red' ? 'btn-amber' : ''}`}
+                style={{ flex: 1 }}
               >
-                k={num}
+                🔴 Class Red
               </button>
-            ))}
+              <button
+                onClick={() => setNewPointClass('Blue')}
+                className={`btn-tactile btn-xs ${newPointClass === 'Blue' ? 'btn-primary' : ''}`}
+                style={{ flex: 1 }}
+              >
+                🔵 Class Blue
+              </button>
+            </div>
           </div>
         </div>
 
-        <div>
-          <label className="text-xs font-medium text-slate-400 block mb-1">Distance Metric</label>
-          <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
-            <button
-              onClick={() => setMetric('euclidean')}
-              className={`py-1 text-xs rounded font-medium ${
-                metric === 'euclidean' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400'
-              }`}
-            >
-              Euclidean (L₂)
-            </button>
-            <button
-              onClick={() => setMetric('manhattan')}
-              className={`py-1 text-xs rounded font-medium ${
-                metric === 'manhattan' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400'
-              }`}
-            >
-              Manhattan (L₁)
-            </button>
-          </div>
-        </div>
+        {/* 2D Decision Boundary Canvas */}
+        <div
+          style={{
+            background: 'var(--lab-bg-obsidian)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--lab-border-active)',
+            padding: '1rem',
+            position: 'relative',
+          }}
+        >
+          {/* Top Status Readout */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Query Point Q({queryPoint.x}, {queryPoint.y}):</span>
+              <span
+                className="badge font-mono"
+                style={{
+                  background:
+                    queryResult.label === 'Red'
+                      ? 'rgba(239, 68, 68, 0.25)'
+                      : queryResult.label === 'Blue'
+                      ? 'rgba(56, 189, 248, 0.25)'
+                      : 'rgba(255, 255, 255, 0.1)',
+                  color:
+                    queryResult.label === 'Red'
+                      ? '#f87171'
+                      : queryResult.label === 'Blue'
+                      ? '#38bdf8'
+                      : '#cbd5e1',
+                  border: `1px solid ${queryResult.label === 'Red' ? '#ef4444' : queryResult.label === 'Blue' ? '#38bdf8' : '#94a3b8'}`,
+                }}
+              >
+                PREDICTED: {queryResult.label.toUpperCase()}
+              </span>
+            </div>
 
-        <div>
-          <label className="text-xs font-medium text-slate-400 block mb-1">Add Training Point at Q</label>
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => { setPointToAddLabel('Red'); handleAddTrainingPoint(); }}
-              className="flex-1 py-1 text-xs bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded border border-rose-500/40 font-semibold"
-            >
-              + Add Red Point
-            </button>
-            <button
-              onClick={() => { setPointToAddLabel('Blue'); handleAddTrainingPoint(); }}
-              className="flex-1 py-1 text-xs bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded border border-cyan-500/40 font-semibold"
-            >
-              + Add Blue Point
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2D Interactive Plane & Table */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* SVG Plane */}
-        <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col items-center">
-          <div className="text-xs text-slate-400 mb-2 w-full flex justify-between font-mono">
-            <span>Click plane to place Query Point Q</span>
-            <span className="text-amber-400">Q: ({queryPoint.x}, {queryPoint.y})</span>
+            {/* Voting tally */}
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Red Votes: </span>
+                <strong className="font-mono text-rose-400">
+                  {weightedVoting ? queryResult.redScore.toFixed(2) : queryResult.redScore}
+                </strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--text-muted)' }}>Blue Votes: </span>
+                <strong className="font-mono text-cyan-400">
+                  {weightedVoting ? queryResult.blueScore.toFixed(2) : queryResult.blueScore}
+                </strong>
+              </div>
+            </div>
           </div>
 
-          <div className="w-full aspect-square max-w-[340px]">
+          {/* SVG Canvas */}
+          <div style={{ width: '100%', height: '260px' }}>
             <svg
-              viewBox="0 0 400 360"
-              className="w-full h-full cursor-crosshair border border-slate-800 rounded-lg bg-slate-900/40"
+              viewBox={`0 0 ${svgW} ${svgH}`}
               onClick={handleCanvasClick}
+              style={{ width: '100%', height: '100%', cursor: 'crosshair', userSelect: 'none' }}
             >
+              {/* Heatmap Mesh */}
+              {showHeatmap &&
+                heatmapMesh.map((cell, idx) => {
+                  const px = toPx(cell.x);
+                  const py = toPy(cell.y);
+                  const fillColor =
+                    cell.label === 'Red'
+                      ? 'rgba(239, 68, 68, 0.12)'
+                      : cell.label === 'Blue'
+                      ? 'rgba(56, 189, 248, 0.12)'
+                      : 'transparent';
+
+                  return (
+                    <circle
+                      key={`hm-${idx}`}
+                      cx={px}
+                      cy={py}
+                      r="9"
+                      fill={fillColor}
+                      stroke="none"
+                    />
+                  );
+                })}
+
               {/* Grid Lines */}
-              {[1, 2, 3, 4, 5, 6, 7].map((val) => {
-                const gx = 40 + (val / 8) * 320;
-                const gy = 320 - (val / 7) * 300;
+              {[0, 2, 4, 6, 8, 10].map((xVal) => {
+                const px = toPx(xVal);
                 return (
-                  <g key={val}>
-                    <line x1={gx} y1={20} x2={gx} y2={320} stroke="#1e293b" strokeWidth="1" />
-                    <line x1={40} y1={gy} x2={360} y2={gy} stroke="#1e293b" strokeWidth="1" />
-                    <text x={gx} y={335} textAnchor="middle" className="text-[10px] fill-slate-500 font-mono">
-                      {val}
-                    </text>
-                    <text x={30} y={gy + 3} textAnchor="end" className="text-[10px] fill-slate-500 font-mono">
-                      {val}
+                  <g key={`x-${xVal}`}>
+                    <line x1={px} y1={margin.top} x2={px} y2={margin.top + plotH} stroke="rgba(255, 255, 255, 0.05)" />
+                    <text x={px} y={margin.top + plotH + 15} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="monospace">
+                      {xVal}
                     </text>
                   </g>
                 );
               })}
 
-              {/* Bounding circle for Euclidean radius */}
-              {metric === 'euclidean' && radius > 0 && (
-                <circle
-                  cx={40 + (queryPoint.x / 8) * 320}
-                  cy={320 - (queryPoint.y / 7) * 300}
-                  r={(radius / 8) * 320}
-                  fill="rgba(6, 182, 212, 0.08)"
-                  stroke="#06b6d4"
-                  strokeDasharray="4,3"
-                  strokeWidth="1.5"
-                />
-              )}
-
-              {/* Connecting lines from Q to selected k neighbors */}
-              {neighbors.map((n) => {
-                const qx = 40 + (queryPoint.x / 8) * 320;
-                const qy = 320 - (queryPoint.y / 7) * 300;
-                const nx = 40 + (n.x / 8) * 320;
-                const ny = 320 - (n.y / 7) * 300;
+              {[0, 2, 4, 6, 8].map((yVal) => {
+                const py = toPy(yVal);
                 return (
-                  <line
-                    key={n.id}
-                    x1={qx}
-                    y1={qy}
-                    x2={nx}
-                    y2={ny}
-                    stroke={n.label === 'Red' ? '#fb7185' : '#38bdf8'}
-                    strokeWidth="2"
-                    strokeDasharray="3,2"
-                  />
+                  <g key={`y-${yVal}`}>
+                    <line x1={margin.left} y1={py} x2={margin.left + plotW} y2={py} stroke="rgba(255, 255, 255, 0.05)" />
+                    <text x={margin.left - 8} y={py + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="monospace">
+                      {yVal}
+                    </text>
+                  </g>
                 );
               })}
 
-              {/* Training points */}
+              {/* Distance radius circle around Query Point */}
+              {queryResult.radius > 0 && metric === 'euclidean' && (
+                <circle
+                  cx={toPx(queryPoint.x)}
+                  cy={toPy(queryPoint.y)}
+                  r={(queryResult.radius / 10) * plotW}
+                  fill="none"
+                  stroke="var(--lab-accent-cyan)"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 3"
+                />
+              )}
+
+              {/* Training Points */}
               {points.map((pt) => {
-                const cx = 40 + (pt.x / 8) * 320;
-                const cy = 320 - (pt.y / 7) * 300;
-                const isSelectedNeighbor = neighbors.some((n) => n.id === pt.id);
+                const cx = toPx(pt.x);
+                const cy = toPy(pt.y);
+                const isNeighbor = queryNeighbors.some((n) => n.id === pt.id);
 
                 return (
                   <g key={pt.id}>
+                    {isNeighbor && (
+                      <circle cx={cx} cy={cy} r="11" fill="none" stroke="var(--lab-accent-lime)" strokeWidth="2" />
+                    )}
                     <circle
                       cx={cx}
                       cy={cy}
-                      r={isSelectedNeighbor ? 8 : 5}
-                      className={`transition-all ${
-                        pt.label === 'Red'
-                          ? 'fill-rose-500 stroke-white'
-                          : 'fill-cyan-400 stroke-white'
-                      } ${isSelectedNeighbor ? 'stroke-2 ring-2 ring-white shadow-lg' : 'stroke-1'}`}
+                      r="6.5"
+                      fill={pt.label === 'Red' ? '#ef4444' : '#38bdf8'}
+                      stroke="#000"
+                      strokeWidth="1.5"
                     />
-                    <text x={cx} y={cy - 10} textAnchor="middle" className="text-[10px] font-bold fill-white font-mono">
+                    <text
+                      x={cx}
+                      y={cy + 3}
+                      fill="#fff"
+                      fontSize="8"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                      fontFamily="monospace"
+                      pointerEvents="none"
+                    >
                       {pt.id}
                     </text>
                   </g>
@@ -258,81 +491,76 @@ export const KNNClassifierLab: React.FC = () => {
               })}
 
               {/* Query Point Q */}
-              <g>
-                <circle
-                  cx={40 + (queryPoint.x / 8) * 320}
-                  cy={320 - (queryPoint.y / 7) * 300}
-                  r="7"
-                  className="fill-amber-400 stroke-slate-950 stroke-2 animate-pulse"
+              <g transform={`translate(${toPx(queryPoint.x)}, ${toPy(queryPoint.y)})`}>
+                <polygon
+                  points="0,-10 9,6 -9,6"
+                  fill="var(--lab-accent-lime)"
+                  stroke="#000"
+                  strokeWidth="1.5"
                 />
-                <text
-                  x={40 + (queryPoint.x / 8) * 320}
-                  y={320 - (queryPoint.y / 7) * 300 - 10}
-                  textAnchor="middle"
-                  className="text-[11px] font-bold fill-amber-300 font-mono"
-                >
+                <text x="0" y="2" fill="#000" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
                   Q
                 </text>
               </g>
             </svg>
           </div>
+
+          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem', textAlign: 'center' }}>
+            Click anywhere to move Query Point Q (lime triangle). Hold <strong>Shift + Click</strong> to add a new training point.
+          </div>
         </div>
 
-        {/* Distance Ranking Table */}
-        <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-between">
-          <div className="text-xs text-slate-400 font-mono mb-2 flex justify-between items-center">
-            <span>Neighbor Distance Ranking (Ascending)</span>
-            <span className="text-cyan-400 font-bold">Top {k} count for vote</span>
+        {/* Neighbors Table & Educational Insight */}
+        <div className="grid-2">
+          {/* Nearest Neighbors Roster */}
+          <div className="card" style={{ padding: '1rem' }}>
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              k = {k} Nearest Neighbors to Q
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {queryNeighbors.map((n, rank) => (
+                <div
+                  key={n.id}
+                  style={{
+                    padding: '0.35rem 0.6rem',
+                    borderRadius: '4px',
+                    background: 'var(--lab-bg-surface)',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>#{rank + 1}</span>
+                    <strong style={{ color: n.label === 'Red' ? '#f87171' : '#38bdf8' }}>Point {n.id}</strong>
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>({n.x}, {n.y})</span>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Dist: </span>
+                    <strong className="font-mono text-cyan-400">{n.dist.toFixed(2)}</strong>
+                    {weightedVoting && (
+                      <span style={{ marginLeft: '0.5rem', color: 'var(--lab-accent-lime)' }}>
+                        w={((1.0 / Math.pow(Math.max(0.01, n.dist), 2))).toFixed(1)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left text-slate-300">
-              <thead className="bg-slate-900 text-slate-400 font-mono text-[10px] uppercase border-b border-slate-800">
-                <tr>
-                  <th className="p-2">Rank</th>
-                  <th className="p-2">Point</th>
-                  <th className="p-2">Coords</th>
-                  <th className="p-2">Class</th>
-                  <th className="p-2">Distance d(Q, x)</th>
-                  <th className="p-2 text-right">In Vote?</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-900 font-mono">
-                {sorted.map((item, idx) => {
-                  const isInTopK = idx < k;
-                  return (
-                    <tr
-                      key={item.id}
-                      className={isInTopK ? (item.label === 'Red' ? 'bg-rose-950/20' : 'bg-cyan-950/20') : ''}
-                    >
-                      <td className="p-2 text-slate-500">{idx + 1}</td>
-                      <td className="p-2 font-bold text-white">{item.id}</td>
-                      <td className="p-2 text-slate-400">({item.x}, {item.y})</td>
-                      <td className="p-2">
-                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          item.label === 'Red' ? 'bg-rose-500/20 text-rose-300' : 'bg-cyan-500/20 text-cyan-300'
-                        }`}>
-                          {item.label}
-                        </span>
-                      </td>
-                      <td className="p-2 font-bold text-white">{item.distance.toFixed(2)}</td>
-                      <td className="p-2 text-right">
-                        {isInTopK ? (
-                          <span className="text-emerald-400 font-bold">YES</span>
-                        ) : (
-                          <span className="text-slate-600">No</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs text-slate-400 font-mono">
-            Vote Summary: <strong className="text-rose-400">{redVotes} Red</strong> vs{' '}
-            <strong className="text-cyan-400">{blueVotes} Blue</strong> → Predicted: <strong className="text-white">{predictedLabel}</strong>
+          {/* Educational Insight Card */}
+          <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--lab-accent-cyan)', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+              <HelpCircle size={15} />
+              <span>k-NN Decision Boundary Dynamics</span>
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              Notice how <strong>k = 1</strong> creates small isolated boundary islands (overfitting to individual noisy samples).
+              As you increase <strong>k to 5 or 9</strong>, the separating boundary smooths out into a continuous partition, filtering out local anomalies.
+            </p>
           </div>
         </div>
       </div>
