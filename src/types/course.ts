@@ -64,7 +64,18 @@ export interface GlossaryItem {
   id: string;
   term: string;
   termEs?: string;
-  category: 'Foundation' | 'Uninformed Search' | 'Informed Search' | 'Adversarial Search' | 'Ethics & Governance';
+  category:
+    | 'Foundation'
+    | 'Uninformed Search'
+    | 'Informed Search'
+    | 'Adversarial Search'
+    | 'Ethics & Governance'
+    | 'Reinforcement Learning'
+    | 'Combinatorial Optimization'
+    | 'Local Search'
+    | 'Genetic Algorithms'
+    | 'Machine Learning'
+    | 'Supervised Classification';
   definition: string;
   formalNotation?: string;
   example: string;
@@ -85,6 +96,8 @@ export interface QuizQuestion {
   explanation: string;
   difficulty: 'Foundation' | 'Intermediate' | 'Exam-Level';
   slideRef: SlideReference;
+  hints?: string[];
+  mistakeExplanations?: Record<string | number, string>;
 }
 
 export interface BookmarkItem {

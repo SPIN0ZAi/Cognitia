@@ -46,6 +46,18 @@ export function parseLocation(
       lessonId = 'lesson-3';
     } else if (rawLesson === '4' || rawLesson === 'lesson-4') {
       lessonId = 'lesson-4';
+    } else if (rawLesson === '5' || rawLesson === 'lesson-5') {
+      lessonId = 'lesson-5';
+    } else if (rawLesson === '6' || rawLesson === 'lesson-6') {
+      lessonId = 'lesson-6';
+    } else if (rawLesson === '7' || rawLesson === 'lesson-7') {
+      lessonId = 'lesson-7';
+    } else if (rawLesson === '8' || rawLesson === 'lesson-8') {
+      lessonId = 'lesson-8';
+    } else if (rawLesson === '9' || rawLesson === 'lesson-9') {
+      lessonId = 'lesson-9';
+    } else if (rawLesson === '10' || rawLesson === 'lesson-10') {
+      lessonId = 'lesson-10';
     } else {
       lessonId = 'lesson-1';
     }
@@ -60,6 +72,10 @@ export function parseLocation(
 
   if (clean === 'practice') {
     return { view: 'practice' };
+  }
+
+  if (clean === 'exam' || clean === 'simulator') {
+    return { view: 'exam' };
   }
 
   if (clean === 'glossary') {
@@ -99,6 +115,8 @@ export function buildUrl(
     }
     case 'practice':
       return '/practice';
+    case 'exam':
+      return '/exam';
     case 'glossary':
       return '/glossary';
     case 'progress':
@@ -117,6 +135,8 @@ export function getRouteTitle(state: RouteState): string {
   switch (state.view) {
     case 'home':
       return 'Cognitia — Intelligent Systems Platform';
+    case 'exam':
+      return 'Exam Simulator & Assessment — Cognitia';
     case 'lesson':
       if (state.lessonId === 'lesson-1') {
         return 'Lesson 1: Introduction to AI & Rational Agents — Cognitia';
@@ -129,6 +149,24 @@ export function getRouteTitle(state: RouteState): string {
       }
       if (state.lessonId === 'lesson-4') {
         return 'Lesson 4: Adversarial Search & Games — Cognitia';
+      }
+      if (state.lessonId === 'lesson-5') {
+        return 'Lesson 5: Reinforcement Learning & MDPs — Cognitia';
+      }
+      if (state.lessonId === 'lesson-6') {
+        return 'Lesson 6: Combinatorial Optimization — Cognitia';
+      }
+      if (state.lessonId === 'lesson-7') {
+        return 'Lesson 7: Metaheuristics & Local Search — Cognitia';
+      }
+      if (state.lessonId === 'lesson-8') {
+        return 'Lesson 8: Genetic Algorithms & Evolutionary Computation — Cognitia';
+      }
+      if (state.lessonId === 'lesson-9') {
+        return 'Lesson 9: Machine Learning Foundations — Cognitia';
+      }
+      if (state.lessonId === 'lesson-10') {
+        return 'Lesson 10: Supervised Classification & Evaluation — Cognitia';
       }
       return 'Lesson — Cognitia';
     case 'practice':

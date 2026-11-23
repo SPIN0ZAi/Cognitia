@@ -497,4 +497,147 @@ export const GLOSSARY_DATA: GlossaryItem[] = [
     relatedSectionId: 'four-phases-of-mcts',
     slideRef: { lessonId: 'lesson-4', slideNumber: 64 },
   },
+  // ==========================================
+  // LESSON 5: REINFORCEMENT LEARNING
+  // ==========================================
+  {
+    id: 'mdp',
+    term: 'Markov Decision Process (MDP)',
+    termEs: 'Proceso de Decisión de Markov',
+    category: 'Reinforcement Learning',
+    definition:
+      'A formal mathematical framework for modeling decision making in discrete-time stochastic environments, defined by tuple (S, A, T, R, γ). Future states satisfy the Markov property.',
+    formalNotation: '\\mathcal{M} = \\langle \\mathcal{S}, \\mathcal{A}, \\mathcal{T}, \\mathcal{R}, \\gamma \\rangle, \\quad P(s_{t+1} \\mid s_t, a_t, s_{t-1}, ...) = P(s_{t+1} \\mid s_t, a_t)',
+    example:
+      'A robot navigating a grid world with slippery transitions (80% forward, 10% left, 10% right) receiving -0.04 living cost and +1 at the goal state.',
+    commonConfusion:
+      'In an MDP, rewards can be associated with states R(s), state-actions R(s, a), or transitions R(s, a, s\').',
+    relatedLessonId: 'lesson-5',
+    relatedSectionId: 'mdp-formal-tuple-definition',
+    slideRef: { lessonId: 'lesson-5', slideNumber: 15 },
+  },
+  {
+    id: 'bellman-equation',
+    term: 'Bellman Optimality Equation',
+    termEs: 'Ecuación de Optimalidad de Bellman',
+    category: 'Reinforcement Learning',
+    definition:
+      'A recursive decomposition expressing the optimal utility of a state as the immediate reward plus the discounted expected optimal utility of the succeeding state under the optimal action.',
+    formalNotation: 'U^*(s) = R(s) + \\gamma \\max_{a \\in A(s)} \\sum_{s\'} P(s\' \\mid s, a) U^*(s\')',
+    example:
+      'Calculating U*(s0) = 34.35 € in the UCLM Two-Stage Betting MDP by taking the expectation over Coin 2.',
+    commonConfusion:
+      'Value Iteration applies this equation as an iterative contraction operator until convergence ||U_{k+1} - U_k|| < ε(1-γ)/γ.',
+    relatedLessonId: 'lesson-5',
+    relatedSectionId: 'bellman-optimality-and-value-iteration',
+    slideRef: { lessonId: 'lesson-5', slideNumber: 28 },
+  },
+  {
+    id: 'q-learning',
+    term: 'Q-Learning',
+    termEs: 'Aprendizaje Q',
+    category: 'Reinforcement Learning',
+    definition:
+      'An off-policy temporal difference algorithm that directly learns the optimal action-value function Q*(s, a) without requiring a transition model of the environment.',
+    formalNotation: 'Q(s, a) \\leftarrow Q(s, a) + \\alpha \\left[ r + \\gamma \\max_{a\'} Q(s\', a\') - Q(s, a) \\right]',
+    example:
+      'An agent navigating Cliff Walking learns the optimal 13-step path right alongside the cliff edge because it assumes optimal future greedy moves.',
+    commonConfusion:
+      'Q-learning is off-policy because it evaluates the greedy target policy while behaving according to an exploratory ε-greedy behavior policy.',
+    relatedLessonId: 'lesson-5',
+    relatedSectionId: 'q-learning-td-algorithm',
+    slideRef: { lessonId: 'lesson-5', slideNumber: 52 },
+  },
+  // ==========================================
+  // LESSON 6: COMBINATORIAL OPTIMIZATION
+  // ==========================================
+  {
+    id: 'max-sat',
+    term: 'Max-SAT (Maximum Satisfiability)',
+    termEs: 'Máxima Satisfacibilidad',
+    category: 'Combinatorial Optimization',
+    definition:
+      'The optimization counterpart of Boolean Satisfiability where the goal is finding a truth assignment that maximizes the number of satisfied clauses in a CNF formula.',
+    formalNotation: '\\max_{c \\in \\{0, 1\\}^n} f(c) = \\sum_{i=1}^m \\mathbb{I}[C_i(c) = \\text{true}]',
+    example:
+      'Assigning values to 5 boolean variables such that 14 out of 16 clauses in a 3-CNF formula evaluate to true.',
+    commonConfusion:
+      'Decision SAT has a flat step landscape (0 or 1); Max-SAT creates an informative gradient that allows heuristic search algorithms to navigate toward satisfaction.',
+    relatedLessonId: 'lesson-6',
+    relatedSectionId: 'sat-vs-maxsat-gradient',
+    slideRef: { lessonId: 'lesson-6', slideNumber: 24 },
+  },
+  // ==========================================
+  // LESSON 7: LOCAL SEARCH & HILL CLIMBING
+  // ==========================================
+  {
+    id: 'simulated-annealing',
+    term: 'Simulated Annealing',
+    termEs: 'Recocido Simulado',
+    category: 'Local Search',
+    definition:
+      'A trajectory-based metaheuristic inspired by metallurgical cooling that probabilistically accepts worsening candidate moves according to the Metropolis criterion to escape local optima.',
+    formalNotation: 'P(\\text{accept}) = \\exp(-\\Delta / T) \\quad \\text{for } \\Delta = f(x\') - f(x) > 0, \\quad T_{k+1} = \\alpha T_k',
+    example:
+      'Accepting a worsening move (Δ = 2 at T = 10) with 82% probability early in the search, but rejecting it later when T = 0.5 (1.8% probability).',
+    commonConfusion:
+      'Simulated Annealing is not pure random walk; worsening moves are accepted based on both the temperature T AND the magnitude of deterioration Δ.',
+    relatedLessonId: 'lesson-7',
+    relatedSectionId: 'simulated-annealing-and-metropolis',
+    slideRef: { lessonId: 'lesson-7', slideNumber: 48 },
+  },
+  // ==========================================
+  // LESSON 8: GENETIC ALGORITHMS
+  // ==========================================
+  {
+    id: 'elitism',
+    term: 'Elitism',
+    termEs: 'Elitismo',
+    category: 'Genetic Algorithms',
+    definition:
+      'A generational replacement strategy in Evolutionary Algorithms that copies the top e individuals directly and unmodified into the next generation.',
+    formalNotation: 'f(x^*_{t+1}) \\ge f(x^*_t) \\quad \\forall t',
+    example:
+      'Preserving the best Sony AIBO robot gait parameter vector across generations so that stochastic mutation never loses the fastest speed achieved.',
+    commonConfusion:
+      'Without elitism, a Genetic Algorithm can lose its best solution due to destructive crossover or mutation, preventing monotonic convergence.',
+    relatedLessonId: 'lesson-8',
+    relatedSectionId: 'crossover-and-mutation',
+    slideRef: { lessonId: 'lesson-8', slideNumber: 35 },
+  },
+  // ==========================================
+  // LESSONS 9 & 10: MACHINE LEARNING & CLASSIFICATION
+  // ==========================================
+  {
+    id: 'overfitting',
+    term: 'Overfitting (High Variance)',
+    termEs: 'Sobreajuste (Alta Varianza)',
+    category: 'Machine Learning',
+    definition:
+      'A pathology where a high-capacity model fits the idiosyncratic noise of the training data rather than the underlying generative distribution, leading to near-zero training error but terrible test generalization.',
+    formalNotation: '\\text{Error}_{\\text{train}} \\to 0, \\quad \\text{Error}_{\\text{test}} \\gg 0',
+    example:
+      'Fitting a 9th-degree polynomial to 10 noisy data points, passing through every point but oscillating wildly between points.',
+    commonConfusion:
+      'Achieving 100% training accuracy does not mean the model is good; on noisy datasets, it is almost always a symptom of severe overfitting.',
+    relatedLessonId: 'lesson-9',
+    relatedSectionId: 'overfitting-and-underfitting',
+    slideRef: { lessonId: 'lesson-9', slideNumber: 22 },
+  },
+  {
+    id: 'confusion-matrix',
+    term: 'Confusion Matrix & Accuracy Paradox',
+    termEs: 'Matriz de Confusión y Paradoja de la Precisión',
+    category: 'Supervised Classification',
+    definition:
+      'A 2x2 contingency table tabulating True Positives, False Positives, False Negatives, and True Negatives. In imbalanced datasets, high accuracy can conceal zero predictive utility (Accuracy Paradox).',
+    formalNotation: '\\text{Accuracy} = \\frac{TP + TN}{N}, \\quad \\text{Precision} = \\frac{TP}{TP + FP}, \\quad \\text{Recall} = \\frac{TP}{TP + FN}',
+    example:
+      'A clinical disease test with 990 healthy patients and 10 cancer patients: predicting healthy for everyone yields 99% accuracy but 0% recall.',
+    commonConfusion:
+      'Never judge an imbalanced classifier by Accuracy alone; evaluate Precision, Recall (Sensitivity), and F1-score.',
+    relatedLessonId: 'lesson-10',
+    relatedSectionId: 'classification-metrics-formulas',
+    slideRef: { lessonId: 'lesson-10', slideNumber: 52 },
+  },
 ];

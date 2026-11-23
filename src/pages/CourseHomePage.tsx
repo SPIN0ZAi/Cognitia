@@ -17,6 +17,12 @@ import { LESSON_1_DATA } from '../data/lesson1Data';
 import { LESSON_2_DATA } from '../data/lesson2Data';
 import { LESSON_3_DATA } from '../data/lesson3Data';
 import { LESSON_4_DATA } from '../data/lesson4Data';
+import { LESSON_5_DATA } from '../data/lesson5Data';
+import { LESSON_6_DATA } from '../data/lesson6Data';
+import { LESSON_7_DATA } from '../data/lesson7Data';
+import { LESSON_8_DATA } from '../data/lesson8Data';
+import { LESSON_9_DATA } from '../data/lesson9Data';
+import { LESSON_10_DATA } from '../data/lesson10Data';
 import {
   TactileButton,
   StatusLed,
@@ -28,7 +34,18 @@ export const CourseHomePage: React.FC<{
   onNavigate: (view: string, lessonId?: string, sectionId?: string) => void;
 }> = ({ onNavigate }) => {
   const { progress, combinedProgress } = useStudy();
-  const lessons = [LESSON_1_DATA, LESSON_2_DATA, LESSON_3_DATA, LESSON_4_DATA];
+  const lessons = [
+    LESSON_1_DATA,
+    LESSON_2_DATA,
+    LESSON_3_DATA,
+    LESSON_4_DATA,
+    LESSON_5_DATA,
+    LESSON_6_DATA,
+    LESSON_7_DATA,
+    LESSON_8_DATA,
+    LESSON_9_DATA,
+    LESSON_10_DATA,
+  ];
 
   // Calculate total completed sections
   let totalSections = 0;
@@ -75,13 +92,61 @@ export const CourseHomePage: React.FC<{
         badge: 'MISSION 03',
         desc: 'Explore Manhattan heuristics, admissibility proofs, and Romania route optimization.',
       };
-    } else {
+    } else if (!isLessonComplete('lesson-4')) {
       return {
         lessonId: 'lesson-4',
         sectionId: 'competitive-environments-and-contingent-strategies',
         title: 'Lesson 4: Adversarial Search & Decisions in Games',
         badge: 'MISSION 04',
         desc: 'Master Minimax, Alpha-Beta pruning, Expectiminimax, and Monte Carlo Tree Search against enemy agents.',
+      };
+    } else if (!isLessonComplete('lesson-5')) {
+      return {
+        lessonId: 'lesson-5',
+        sectionId: 'stochastic-worlds-and-markov',
+        title: 'Lesson 5: Reinforcement Learning & MDPs',
+        badge: 'MISSION 05',
+        desc: 'Master Markov Decision Processes, Bellman equations, Value Iteration, and Q-learning vs SARSA.',
+      };
+    } else if (!isLessonComplete('lesson-6')) {
+      return {
+        lessonId: 'lesson-6',
+        sectionId: 'state-as-solution-vs-paths',
+        title: 'Lesson 6: Combinatorial Optimization Foundations',
+        badge: 'MISSION 06',
+        desc: 'Explore configuration spaces, SAT vs Max-SAT, fixed-r graph coloring, and TSP permutation explosions.',
+      };
+    } else if (!isLessonComplete('lesson-7')) {
+      return {
+        lessonId: 'lesson-7',
+        sectionId: 'trajectory-search-concept',
+        title: 'Lesson 7: Local Search & Hill Climbing Variants',
+        badge: 'MISSION 07',
+        desc: 'Discover neighborhood structures, plateaus, ridges, RLS, ILS, and Simulated Annealing with Metropolis cooling.',
+      };
+    } else if (!isLessonComplete('lesson-8')) {
+      return {
+        lessonId: 'lesson-8',
+        sectionId: 'biological-metaphor-and-population',
+        title: 'Lesson 8: Genetic Algorithms & Evolutionary Search',
+        badge: 'MISSION 08',
+        desc: 'Simulate populations, roulette selection, crossover, mutation, elitism, and AIBO robot gait optimization.',
+      };
+    } else if (!isLessonComplete('lesson-9')) {
+      return {
+        lessonId: 'lesson-9',
+        sectionId: 'classical-vs-ml',
+        title: 'Lesson 9: Machine Learning Foundations',
+        badge: 'MISSION 09',
+        desc: 'Understand data induction, Supervised vs Unsupervised vs RL, overfitting, and the bias-variance tradeoff.',
+      };
+    } else {
+      return {
+        lessonId: 'lesson-10',
+        sectionId: 'knn-mechanics',
+        title: 'Lesson 10: Supervised Classification & Evaluation',
+        badge: 'MISSION 10',
+        desc: 'Master k-NN decision boundaries, Shannon entropy, the confusion matrix, and the accuracy paradox.',
       };
     }
   };
@@ -187,7 +252,7 @@ export const CourseHomePage: React.FC<{
             </span>
           </div>
 
-          <svg viewBox="0 0 760 140" style={{ width: '100%', height: 'auto', display: 'block' }}>
+          <svg viewBox="0 0 960 220" style={{ width: '100%', height: 'auto', display: 'block' }}>
             <defs>
               <linearGradient id="linkGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#78D5E8" stopOpacity="0.8" />
@@ -197,58 +262,112 @@ export const CourseHomePage: React.FC<{
                 <stop offset="0%" stopColor="#C6F277" stopOpacity="0.8" />
                 <stop offset="100%" stopColor="#E9B777" stopOpacity="0.8" />
               </linearGradient>
+              <linearGradient id="linkGrad3" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#E9B777" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#fb7185" stopOpacity="0.8" />
+              </linearGradient>
+              <linearGradient id="linkGradExam" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.7" />
+                <stop offset="100%" stopColor="#10b981" stopOpacity="0.9" />
+              </linearGradient>
             </defs>
 
             {/* Connecting Channels */}
-            <line x1="140" y1="70" x2="380" y2="70" stroke="url(#linkGrad1)" strokeWidth="2.5" strokeDasharray="6 4" />
-            <line x1="380" y1="70" x2="620" y2="70" stroke="url(#linkGrad2)" strokeWidth="2.5" strokeDasharray="6 4" />
+            {/* Track 1: Search */}
+            <line x1="80" y1="55" x2="200" y2="55" stroke="url(#linkGrad1)" strokeWidth="2" strokeDasharray="4 3" />
+            <line x1="200" y1="55" x2="320" y2="55" stroke="url(#linkGrad1)" strokeWidth="2" strokeDasharray="4 3" />
+            <line x1="320" y1="55" x2="440" y2="55" stroke="url(#linkGrad2)" strokeWidth="2" strokeDasharray="4 3" />
 
+            {/* Track 2: Optimization & RL */}
+            <line x1="80" y1="165" x2="200" y2="165" stroke="url(#linkGrad3)" strokeWidth="2" strokeDasharray="4 3" />
+            <line x1="200" y1="165" x2="320" y2="165" stroke="url(#linkGrad3)" strokeWidth="2" strokeDasharray="4 3" />
+            <line x1="320" y1="165" x2="440" y2="165" stroke="url(#linkGrad2)" strokeWidth="2" strokeDasharray="4 3" />
+
+            {/* Channels into Exam Hub */}
+            <line x1="440" y1="55" x2="560" y2="110" stroke="url(#linkGradExam)" strokeWidth="2" strokeDasharray="5 3" />
+            <line x1="440" y1="165" x2="560" y2="110" stroke="url(#linkGradExam)" strokeWidth="2" strokeDasharray="5 3" />
+            <line x1="560" y1="110" x2="720" y2="85" stroke="url(#linkGradExam)" strokeWidth="2" strokeDasharray="5 3" />
+            <line x1="720" y1="85" x2="860" y2="125" stroke="url(#linkGradExam)" strokeWidth="2" strokeDasharray="5 3" />
+
+            {/* Track 1: Lessons 1-4 */}
             {/* Node 1: Lesson 1 */}
-            <g
-              transform="translate(140, 70)"
-              style={{ cursor: 'pointer' }}
-              onClick={() => onNavigate('lesson', 'lesson-1')}
-            >
-              <circle r="36" fill="#0b131e" stroke="#78D5E8" strokeWidth="2" />
-              <circle r="44" fill="none" stroke="#78D5E8" strokeWidth="1" strokeOpacity="0.3" strokeDasharray="3 3" />
-              <text textAnchor="middle" y="-6" fill="#78D5E8" fontSize="12" fontWeight="700" fontFamily="var(--font-mono)">
-                LESSON 01
-              </text>
-              <text textAnchor="middle" y="14" fill="#F1F5F9" fontSize="10" fontWeight="600" fontFamily="var(--font-sans)">
-                Intro & Ethics
-              </text>
+            <g transform="translate(80, 55)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-1')}>
+              <circle r="26" fill="#0b131e" stroke="#78D5E8" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#78D5E8" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L01</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Intro</text>
             </g>
 
             {/* Node 2: Lesson 2 */}
-            <g
-              transform="translate(380, 70)"
-              style={{ cursor: 'pointer' }}
-              onClick={() => onNavigate('lesson', 'lesson-2')}
-            >
-              <circle r="36" fill="#0f1910" stroke="#C6F277" strokeWidth="2" />
-              <circle r="44" fill="none" stroke="#C6F277" strokeWidth="1" strokeOpacity="0.3" strokeDasharray="3 3" />
-              <text textAnchor="middle" y="-6" fill="#C6F277" fontSize="12" fontWeight="700" fontFamily="var(--font-mono)">
-                LESSON 02
-              </text>
-              <text textAnchor="middle" y="14" fill="#F1F5F9" fontSize="10" fontWeight="600" fontFamily="var(--font-sans)">
-                Uninformed Search
-              </text>
+            <g transform="translate(200, 55)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-2')}>
+              <circle r="26" fill="#0f1910" stroke="#C6F277" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#C6F277" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L02</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Search</text>
             </g>
 
             {/* Node 3: Lesson 3 */}
-            <g
-              transform="translate(620, 70)"
-              style={{ cursor: 'pointer' }}
-              onClick={() => onNavigate('lesson', 'lesson-3')}
-            >
-              <circle r="36" fill="#1e160a" stroke="#E9B777" strokeWidth="2" />
-              <circle r="44" fill="none" stroke="#E9B777" strokeWidth="1" strokeOpacity="0.3" strokeDasharray="3 3" />
-              <text textAnchor="middle" y="-6" fill="#E9B777" fontSize="12" fontWeight="700" fontFamily="var(--font-mono)">
-                LESSON 03
-              </text>
-              <text textAnchor="middle" y="14" fill="#F1F5F9" fontSize="10" fontWeight="600" fontFamily="var(--font-sans)">
-                Informed & A*
-              </text>
+            <g transform="translate(320, 55)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-3')}>
+              <circle r="26" fill="#1e160a" stroke="#E9B777" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#E9B777" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L03</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">A* Search</text>
+            </g>
+
+            {/* Node 4: Lesson 4 */}
+            <g transform="translate(440, 55)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-4')}>
+              <circle r="26" fill="#1b0f1e" stroke="#c084fc" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#c084fc" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L04</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Games</text>
+            </g>
+
+            {/* Track 2: Lessons 5-8 */}
+            {/* Node 5: Lesson 5 */}
+            <g transform="translate(80, 165)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-5')}>
+              <circle r="26" fill="#0b172a" stroke="#38bdf8" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#38bdf8" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L05</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">RL & MDP</text>
+            </g>
+
+            {/* Node 6: Lesson 6 */}
+            <g transform="translate(200, 165)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-6')}>
+              <circle r="26" fill="#1f140a" stroke="#f59e0b" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#f59e0b" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L06</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Comb Opt</text>
+            </g>
+
+            {/* Node 7: Lesson 7 */}
+            <g transform="translate(320, 165)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-7')}>
+              <circle r="26" fill="#1f0a17" stroke="#fb7185" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#fb7185" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L07</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Local Search</text>
+            </g>
+
+            {/* Node 8: Lesson 8 */}
+            <g transform="translate(440, 165)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-8')}>
+              <circle r="26" fill="#0a191f" stroke="#2dd4bf" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#2dd4bf" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L08</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Genetic Alg</text>
+            </g>
+
+            {/* Center Exam Hub */}
+            <g transform="translate(560, 110)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('exam')}>
+              <circle r="36" fill="#064e3b" stroke="#10b981" strokeWidth="2.5" />
+              <circle r="44" fill="none" stroke="#10b981" strokeWidth="1" strokeOpacity="0.4" strokeDasharray="3 3" />
+              <text textAnchor="middle" y="-4" fill="#34d399" fontSize="11" fontWeight="800" fontFamily="var(--font-mono)">EXAM</text>
+              <text textAnchor="middle" y="12" fill="#F1F5F9" fontSize="9" fontWeight="600" fontFamily="var(--font-sans)">Simulator</text>
+            </g>
+
+            {/* Track 3: Lessons 9-10 */}
+            {/* Node 9: Lesson 9 */}
+            <g transform="translate(720, 85)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-9')}>
+              <circle r="26" fill="#17122b" stroke="#a855f7" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#a855f7" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L09</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">ML Found</text>
+            </g>
+
+            {/* Node 10: Lesson 10 */}
+            <g transform="translate(860, 125)" style={{ cursor: 'pointer' }} onClick={() => onNavigate('lesson', 'lesson-10')}>
+              <circle r="26" fill="#0b1b24" stroke="#06b6d4" strokeWidth="2" />
+              <text textAnchor="middle" y="-3" fill="#06b6d4" fontSize="10" fontWeight="700" fontFamily="var(--font-mono)">L10</text>
+              <text textAnchor="middle" y="10" fill="#94a3b8" fontSize="8" fontFamily="var(--font-sans)">Classifier</text>
             </g>
           </svg>
         </div>
