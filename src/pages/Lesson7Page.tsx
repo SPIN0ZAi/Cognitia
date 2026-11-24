@@ -3,6 +3,7 @@ import { LESSON_7_DATA } from '../data/lesson7Data';
 import { useStudy } from '../context/StudyContext';
 import { Bookmark, CheckCircle2 } from 'lucide-react';
 import { MarkdownRenderer } from '../components/common/MarkdownRenderer';
+import { TSPNeighborhoodsLab } from '../components/visualizers/TSPNeighborhoodsLab';
 import { HillClimbingLab } from '../components/visualizers/HillClimbingLab';
 import { LocalOptimaFailuresLab } from '../components/visualizers/LocalOptimaFailuresLab';
 import { SimulatedAnnealingLab } from '../components/visualizers/SimulatedAnnealingLab';
@@ -176,12 +177,13 @@ export const Lesson7Page: React.FC<{ activeSectionId?: string }> = ({ activeSect
           {/* Interactive Laboratories injected at end of respective chapters */}
           {chapter.number === 1 && (
             <div style={{ marginBottom: '2.5rem' }}>
-              <HillClimbingLab />
+              <TSPNeighborhoodsLab />
             </div>
           )}
 
           {chapter.number === 2 && (
-            <div style={{ marginBottom: '2.5rem' }}>
+            <div style={{ marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              <HillClimbingLab />
               <LocalOptimaFailuresLab />
             </div>
           )}
