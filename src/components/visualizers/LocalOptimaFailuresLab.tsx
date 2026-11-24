@@ -1,256 +1,498 @@
 import React, { useState } from 'react';
+import {
+  RotateCcw,
+  Sparkles,
+  ArrowRight,
+  ShieldAlert,
+  Play,
+} from 'lucide-react';
 
 type PathologyType = 'local-optimum' | 'plateau' | 'ridge';
 
 export const LocalOptimaFailuresLab: React.FC = () => {
   const [pathology, setPathology] = useState<PathologyType>('local-optimum');
-  const [sidewaysEnabled, setSidewaysEnabled] = useState<boolean>(false);
-  const [operatorChoice, setOperatorChoice] = useState<'1-var' | '2-var'>('1-var');
+
+  // Pathology 1: Local Optimum State
+  const [p1State, setP1State] = useState<number>(3); // x=3 is local peak (f=14), x=9 is global peak (f=25)
+  const p1Terrain = [6, 10, 13, 14, 11, 8, 12, 18, 23, 25, 20];
+  const [p1Log, setP1Log] = useState<string>('Climber is currently at local peak x=3 (f=14).');
+
+  // Pathology 2: Plateau State
+  const [p2State, setP2State] = useState<number>(2); // Plateau at 2, 3, 4 (f=12), Summit at 7 (f=22)
+  const p2Terrain = [8, 11, 12, 12, 12, 14, 18, 22, 19];
+  const [p2SidewaysRule, setP2SidewaysRule] = useState<'disabled' | 'unlimited' | 'capped'>('capped');
+  const [p2SidewaysCount, setP2SidewaysCount] = useState<number>(0);
+  const [p2Log, setP2Log] = useState<string>('Climber is at the start of the flat shoulder (x=2, f=12).');
+
+  // Pathology 3: Ridge State (2D coordinate grid where ridge runs diagonally along y = x)
+  const [ridgePos, setRidgePos] = useState<{ x: number; y: number }>({ x: 2, y: 2 });
+  const [ridgeLog, setRidgeLog] = useState<string>(
+    'Climber is on the diagonal ridge at (2, 2). All 4 cardinal 1-step moves step off the ridge into lower terrain!'
+  );
+
+  // Elevation formula for 2D ridge: peaks along y = x, falling off sharply on either side
+  const getRidgeElevation = (x: number, y: number): number => {
+    // Base ridge elevation rises as x and y increase
+    const ridgeProgress = (x + y) * 3;
+    // Cross-ridge distance penalty: (x - y)^2
+    const crossDistance = Math.abs(x - y);
+    return Math.max(0, Math.round(ridgeProgress - crossDistance * 8));
+  };
+
+  // Pathology 1 Step: Local Optimum
+  const stepP1 = (action: 'greedy' | 'random-restart' | 'noise') => {
+    if (action === 'greedy') {
+      const left = p1State > 0 ? p1Terrain[p1State - 1] : -Infinity;
+      const right = p1State < p1Terrain.length - 1 ? p1Terrain[p1State + 1] : -Infinity;
+      const cur = p1Terrain[p1State];
+
+      if (left > cur && left >= right) {
+        setP1State(p1State - 1);
+        setP1Log(`Moved left to x=${p1State - 1} (f=${p1Terrain[p1State - 1]}).`);
+      } else if (right > cur) {
+        setP1State(p1State + 1);
+        setP1Log(`Moved right to x=${p1State + 1} (f=${p1Terrain[p1State + 1]}).`);
+      } else {
+        setP1Log(`HALTED! Both neighbors worsen (Left: f=${left}, Right: f=${right}). Greedy search is trapped at local peak f=${cur}!`);
+      }
+    } else if (action === 'random-restart') {
+      const randX = Math.floor(Math.random() * p1Terrain.length);
+      setP1State(randX);
+      setP1Log(`Random Restart: Jumped to uniform random position x=${randX} (f=${p1Terrain[randX]}).`);
+    } else {
+      // Noise / Kick
+      const jump = Math.random() > 0.5 ? 2 : -2;
+      const newX = Math.max(0, Math.min(p1Terrain.length - 1, p1State + jump));
+      setP1State(newX);
+      setP1Log(`Stochastic Perturbation: Kicked agent by Δx=${jump} to x=${newX} (f=${p1Terrain[newX]}).`);
+    }
+  };
+
+  // Pathology 2 Step: Plateau
+  const stepP2 = () => {
+    const cur = p2Terrain[p2State];
+    const right = p2State < p2Terrain.length - 1 ? p2Terrain[p2State + 1] : -Infinity;
+
+    if (p2State === 7) {
+      setP2Log('SUMMIT CONQUERED! Climber reached global maximum x=7 (f=22).');
+      return;
+    }
+
+    if (right > cur) {
+      setP2State(p2State + 1);
+      setP2SidewaysCount(0);
+      setP2Log(`Ascended slope to x=${p2State + 1} (f=${right})!`);
+    } else if (right === cur) {
+      if (p2SidewaysRule === 'disabled') {
+        setP2Log(`HALTED! Neighbor x=${p2State + 1} has equal score f=${right}. Sideways moves are disabled.`);
+      } else if (p2SidewaysRule === 'unlimited') {
+        // Oscillate or wander
+        const next = p2State === 4 ? 3 : p2State + 1;
+        setP2State(next);
+        setP2SidewaysCount((c) => c + 1);
+        setP2Log(`Unlimited Sideways: Stepped to x=${next} (f=${p2Terrain[next]}). Risk of endless oscillation! (Steps: ${p2SidewaysCount + 1})`);
+      } else {
+        // Capped at 4 moves
+        if (p2SidewaysCount < 4) {
+          setP2State(p2State + 1);
+          setP2SidewaysCount((c) => c + 1);
+          setP2Log(`Capped Sideways Move: Stepped to x=${p2State + 1} across plateau (Count: ${p2SidewaysCount + 1}/4).`);
+        } else {
+          setP2Log(`HALTED! Max sideways moves threshold (4) reached without finding strictly higher elevation.`);
+        }
+      }
+    }
+  };
+
+  // Pathology 3 Step: Ridge
+  const stepRidge = (dir: 'N' | 'S' | 'E' | 'W' | 'NE') => {
+    let nx = ridgePos.x;
+    let ny = ridgePos.y;
+
+    if (dir === 'N') ny += 1;
+    if (dir === 'S') ny -= 1;
+    if (dir === 'E') nx += 1;
+    if (dir === 'W') nx -= 1;
+    if (dir === 'NE') {
+      nx += 1;
+      ny += 1;
+    }
+
+    if (nx < 0 || nx > 5 || ny < 0 || ny > 5) {
+      setRidgeLog('Move out of boundary bounds.');
+      return;
+    }
+
+    const currentElev = getRidgeElevation(ridgePos.x, ridgePos.y);
+    const nextElev = getRidgeElevation(nx, ny);
+
+    if (nextElev > currentElev) {
+      setRidgePos({ x: nx, y: ny });
+      setRidgeLog(`Successful Ascent! Stepped ${dir} to (${nx}, ${ny}) -> Elevation increased from ${currentElev} to ${nextElev}.`);
+    } else {
+      setRidgeLog(`Rejected! Stepping ${dir} drops elevation from ${currentElev} to ${nextElev} (stepping off the ridge!). Single-variable hill climbing halts.`);
+    }
+  };
 
   return (
-    <div className="bg-[#0f172a] border border-rose-500/30 rounded-2xl p-6 shadow-2xl space-y-6">
+    <div className="visualizer-container">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              Diagnostic Laboratory 7.2
-            </span>
-            <h3 className="text-xl font-bold text-white tracking-tight">
-              The Three Pathologies of Hill Climbing
-            </h3>
+      <div className="visualizer-header">
+        <div className="visualizer-title-area">
+          <div className="visualizer-title">
+            <ShieldAlert size={20} style={{ color: 'var(--accent-rose)' }} />
+            The Three Pathologies of Local Search Laboratory (Lesson 7, Slides 17–23)
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Slide 17: Explore why greedy 1-step lookahead fails on Local Optima, Plateaus, and Ridges.
-          </p>
+          <div className="visualizer-subtitle">
+            Interactive Diagnostics for Local Optima, Flat Plateaus/Shoulders & 2D Diagonal Ridges
+          </div>
         </div>
 
         {/* Pathology Selector */}
-        <div className="flex gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
-          {(
-            [
-              { id: 'local-optimum', label: '1. Local Optimum' },
-              { id: 'plateau', label: '2. Plateau' },
-              { id: 'ridge', label: '3. Ridge' },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setPathology(item.id)}
-              className={`px-3 py-1.5 text-xs rounded-lg font-semibold transition-all ${
-                pathology === item.id
-                  ? 'bg-rose-500 text-slate-950 shadow-md font-bold'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="visualizer-controls">
+          <button
+            onClick={() => setPathology('local-optimum')}
+            className={`btn-tactile btn-sm ${pathology === 'local-optimum' ? 'btn-primary' : ''}`}
+          >
+            <span>1. Local Optimum</span>
+          </button>
+          <button
+            onClick={() => setPathology('plateau')}
+            className={`btn-tactile btn-sm ${pathology === 'plateau' ? 'btn-primary' : ''}`}
+          >
+            <span>2. Plateau / Shoulder</span>
+          </button>
+          <button
+            onClick={() => setPathology('ridge')}
+            className={`btn-tactile btn-sm ${pathology === 'ridge' ? 'btn-primary' : ''}`}
+          >
+            <span>3. 2D Ridge</span>
+          </button>
         </div>
       </div>
 
-      {/* Pathology 1: Local Optimum */}
-      {pathology === 'local-optimum' && (
-        <div className="space-y-4">
-          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
-            <strong className="text-rose-400 font-semibold block mb-1">Slide 17 Definition: Local Optimum</strong>
-            No neighbor in <code className="text-cyan-300 font-mono">N(x)</code> improves upon the current configuration, although a far superior global configuration exists elsewhere. Because Hill Climbing strictly refuses worsening moves, search stops dead in its tracks.
-          </div>
-
-          <div className="bg-slate-950 p-6 rounded-xl border border-slate-800">
-            <div className="h-44 w-full relative">
-              <svg className="w-full h-full" viewBox="0 0 600 160">
-                {/* Terrain line */}
-                <path
-                  d="M 20 130 Q 80 130 140 60 Q 180 30 220 80 Q 280 140 380 140 Q 460 20 520 20 Q 560 60 580 130"
-                  fill="none"
-                  stroke="#fb7185"
-                  strokeWidth="3"
-                />
-                {/* Fill under */}
-                <path
-                  d="M 20 130 Q 80 130 140 60 Q 180 30 220 80 Q 280 140 380 140 Q 460 20 520 20 Q 560 60 580 130 L 580 150 L 20 150 Z"
-                  fill="rgba(244, 63, 94, 0.08)"
-                />
-                {/* Local Peak Marker */}
-                <circle cx="180" cy="38" r="6" className="fill-rose-500 animate-pulse stroke-white stroke-2" />
-                <text x="180" y="22" textAnchor="middle" className="text-xs font-bold fill-rose-400 font-mono">
-                  TRAPPED (f = 14)
-                </text>
-                <text x="180" y="150" textAnchor="middle" className="text-[10px] fill-slate-500 font-mono">
-                  Local Optimum: N(x) all decrease
-                </text>
-
-                {/* Global Peak Marker */}
-                <circle cx="490" cy="20" r="5" className="fill-emerald-400" />
-                <text x="490" y="10" textAnchor="middle" className="text-xs font-bold fill-emerald-400 font-mono">
-                  Global Optimum (f = 25)
-                </text>
-                <text x="490" y="150" textAnchor="middle" className="text-[10px] fill-emerald-500/70 font-mono">
-                  Unreachable without escape strategy
-                </text>
-              </svg>
+      <div className="visualizer-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {/* PATHOLOGY 1: LOCAL OPTIMUM */}
+        {pathology === 'local-optimum' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div
+              style={{
+                background: 'var(--lab-bg-surface)',
+                padding: '1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '0.82rem',
+                lineHeight: '1.5',
+              }}
+            >
+              <strong style={{ color: 'var(--accent-rose)' }}>Slide 17 Definition: Local Optimum</strong>
+              <p style={{ marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
+                Every single neighbor in the 1-step neighborhood $N(x)$ yields a worse evaluation score ($f(x') &lt; f(x)$), even though a far superior global maximum exists elsewhere. Because greedy hill climbing strictly refuses worsening moves, search stops dead in its tracks.
+              </p>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 bg-rose-950/20 border border-rose-500/20 rounded-lg text-rose-300">
-                <strong>Why HC fails:</strong> Looking only 1 move ahead, moving left drops from 14 to 11; moving right drops from 14 to 10. Since both moves worsen the score, <code className="font-mono">improves = false</code> and the algorithm returns the suboptimal score 14.
+            {/* Interactive 1D SVG Canvas */}
+            <div
+              style={{
+                background: 'var(--lab-bg-obsidian)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--lab-border-active)',
+                padding: '1rem',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', fontSize: '0.75rem' }}>
+                <span className="badge badge-rose font-mono">Agent at x = {p1State} (f = {p1Terrain[p1State]})</span>
+                <span style={{ color: 'var(--text-muted)' }}>Target: Global Peak at x = 9 (f = 25)</span>
               </div>
-              <div className="p-3 bg-emerald-950/20 border border-emerald-500/20 rounded-lg text-emerald-300">
-                <strong>Course Solution:</strong> Apply <em>Randomized Local Search</em> (RLS restart from a new random state) or <em>Simulated Annealing</em> (accept worsening moves with probability <code className="font-mono">exp(-Δ/T)</code>).
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Pathology 2: Plateau */}
-      {pathology === 'plateau' && (
-        <div className="space-y-4">
-          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
-            <strong className="text-rose-400 font-semibold block mb-1">Slide 17 Definition: Plateau</strong>
-            A flat region in which all neighbouring configurations have the exact same score (<code className="text-cyan-300 font-mono">f(x') = f(x)</code>). Hill Climbing has zero gradient to follow and terminates unless sideways moves are explicitly permitted.
-          </div>
+              <div style={{ width: '100%', height: '170px' }}>
+                <svg viewBox="0 0 500 170" style={{ width: '100%', height: '100%' }}>
+                  {/* Connect points */}
+                  <polyline
+                    fill="none"
+                    stroke="var(--accent-rose)"
+                    strokeWidth="2.5"
+                    points={p1Terrain.map((v, i) => `${30 + (i / 10) * 440},${145 - ((v - 5) / 22) * 120}`).join(' ')}
+                  />
 
-          <div className="bg-slate-950 p-6 rounded-xl border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs text-slate-400">Toggle Sideways Moves to test traversal:</span>
-              <button
-                onClick={() => setSidewaysEnabled(!sidewaysEnabled)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                  sidewaysEnabled
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                }`}
-              >
-                Sideways Moves: {sidewaysEnabled ? 'ALLOWED (Capped)' : 'FORBIDDEN (Standard HC)'}
-              </button>
-            </div>
+                  {/* Discrete nodes */}
+                  {p1Terrain.map((v, i) => {
+                    const cx = 30 + (i / 10) * 440;
+                    const cy = 145 - ((v - 5) / 22) * 120;
+                    const isCur = i === p1State;
 
-            <div className="h-40 w-full relative">
-              <svg className="w-full h-full" viewBox="0 0 600 140">
-                {/* Terrain with plateau */}
-                <path
-                  d="M 20 120 L 140 100 L 220 50 L 420 50 L 500 20 L 580 20"
-                  fill="none"
-                  stroke="#fb7185"
-                  strokeWidth="3"
-                />
-                {/* Plateau region box */}
-                <rect x="220" y="45" width="200" height="10" fill="rgba(244, 63, 94, 0.2)" />
-                <text x="320" y="40" textAnchor="middle" className="text-[11px] font-bold fill-amber-400 font-mono">
-                  PLATEAU ZONE: f(x) = 15 across 200 units
-                </text>
+                    return (
+                      <g key={i}>
+                        <circle cx={cx} cy={cy} r={isCur ? 7 : 3.5} fill={isCur ? 'var(--lab-accent-lime)' : '#64748b'} />
+                        <text x={cx} y="162" fill="var(--text-muted)" fontSize="8.5" textAnchor="middle" fontFamily="monospace">
+                          x={i}
+                        </text>
+                      </g>
+                    );
+                  })}
 
-                {/* Agent location */}
-                <circle cx="260" cy="50" r="6" className="fill-cyan-400 stroke-white stroke-2" />
-                <text x="260" y="70" textAnchor="middle" className="text-xs font-bold fill-cyan-300 font-mono">
-                  Agent at x=260
-                </text>
-
-                {/* Step indicator */}
-                {sidewaysEnabled ? (
-                  <g>
-                    <path d="M 270 50 L 310 50" stroke="#34d399" strokeWidth="2" markerEnd="url(#arrow)" />
-                    <text x="360" y="70" textAnchor="middle" className="text-xs font-semibold fill-emerald-400">
-                      Walks across plateau → reaches peak!
-                    </text>
-                  </g>
-                ) : (
-                  <text x="360" y="70" textAnchor="middle" className="text-xs font-semibold fill-rose-400">
-                    STUCK: Left f=15, Right f=15 (0 &gt; 0 is false) → STOPS!
+                  {/* Local peak label */}
+                  <text x={30 + (3 / 10) * 440} y={145 - ((14 - 5) / 22) * 120 - 10} fill="var(--accent-rose)" fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                    Local Trap (f=14)
                   </text>
-                )}
-              </svg>
-            </div>
 
-            <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-xs text-slate-300">
-              <strong className="text-white">UCLM Examination Rule:</strong> Why must sideways moves be capped? Without a limit (e.g., <code className="font-mono text-cyan-300">maxSideways = 100</code>), an agent on a closed plateau or circular saddle will loop infinitely back and forth between identical states.
-            </div>
-          </div>
-        </div>
-      )}
+                  {/* Global peak label */}
+                  <text x={30 + (9 / 10) * 440} y={145 - ((25 - 5) / 22) * 120 - 10} fill="var(--lab-accent-lime)" fontSize="9" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                    Global Peak (f=25)
+                  </text>
+                </svg>
+              </div>
 
-      {/* Pathology 3: Ridge */}
-      {pathology === 'ridge' && (
-        <div className="space-y-4">
-          <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-300 leading-relaxed">
-            <strong className="text-rose-400 font-semibold block mb-1">Slide 17 Definition: Ridge</strong>
-            A sequence of local peaks where the crest rises along a diagonal axis. Improvement is possible only through a combination of multiple variable moves simultaneously, rather than through any single coordinate neighbour.
-          </div>
-
-          <div className="bg-slate-950 p-6 rounded-xl border border-slate-800">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs text-slate-400">Compare Neighborhood Operators:</span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setOperatorChoice('1-var')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                    operatorChoice === '1-var'
-                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  Standard 1-Coordinate Flip
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                <button onClick={() => stepP1('greedy')} className="btn-tactile btn-sm">
+                  <span>Greedy Step (Try to Climb)</span>
                 </button>
-                <button
-                  onClick={() => setOperatorChoice('2-var')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                    operatorChoice === '2-var'
-                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  Diagonal / 2-Variable Move
+                <button onClick={() => stepP1('random-restart')} className="btn-tactile btn-sm btn-primary">
+                  <RotateCcw size={14} />
+                  <span>Random Restart (Jump to New Basin)</span>
+                </button>
+                <button onClick={() => stepP1('noise')} className="btn-tactile btn-sm btn-amber">
+                  <Sparkles size={14} />
+                  <span>Stochastic Kick (Simulate Annealing Jump)</span>
                 </button>
               </div>
             </div>
 
-            {/* 2D Contour Grid representing a diagonal ridge */}
-            <div className="grid grid-cols-4 gap-2 text-center text-xs font-mono p-4 bg-slate-900 rounded-xl border border-slate-800">
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=10</div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=12</div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=15</div>
-              <div className="p-3 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 font-bold">
-                Crest: f=30 (Peak)
-              </div>
-
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=8</div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=14</div>
-              <div className="p-3 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 font-bold">
-                Crest: f=25
-              </div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=12</div>
-
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=6</div>
-              <div className="p-3 rounded bg-amber-950/80 text-amber-300 border-2 border-amber-500 font-bold animate-pulse">
-                Agent: f=20
-              </div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=10</div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=8</div>
-
-              <div className="p-3 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-500/30 font-bold">
-                Crest: f=15
-              </div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=8</div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=6</div>
-              <div className="p-3 rounded bg-slate-950 text-slate-500">f=4</div>
-            </div>
-
-            <div className="mt-4 p-3 rounded-lg text-xs font-sans leading-relaxed border bg-slate-900 border-slate-800">
-              {operatorChoice === '1-var' ? (
-                <div className="text-rose-300">
-                  <strong className="text-rose-400">Entrapment on the Ridge:</strong> From Agent (<code className="font-mono">f=20</code>), moving 1 step North drops to <code className="font-mono">f=14</code>; moving South drops to <code className="font-mono">f=8</code>; moving East drops to <code className="font-mono">f=10</code>; moving West drops to <code className="font-mono">f=6</code>. All 4 orthogonal 1-variable moves fall down the hillside! Hill Climbing terminates.
-                </div>
-              ) : (
-                <div className="text-cyan-300">
-                  <strong className="text-cyan-400">Ridge Traversed:</strong> By using a compound 2-variable / diagonal operator, the agent tests North-East: <code className="font-mono">(+1, +1)</code> which reaches <code className="font-mono">f=25</code>, directly traversing the crest towards the peak (<code className="font-mono">f=30</code>)!
-                </div>
-              )}
+            <div style={{ padding: '0.65rem 0.9rem', background: 'var(--lab-bg-surface)', borderRadius: '4px', borderLeft: '3px solid var(--accent-rose)', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+              {p1Log}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* PATHOLOGY 2: PLATEAU & SHOULDER */}
+        {pathology === 'plateau' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div
+              style={{
+                background: 'var(--lab-bg-surface)',
+                padding: '1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '0.82rem',
+                lineHeight: '1.5',
+              }}
+            >
+              <strong style={{ color: 'var(--lab-accent-amber)' }}>Slide 21–23: Plateaus and Flat Shoulders</strong>
+              <p style={{ marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
+                A flat region where all neighboring configurations share identical evaluation values ($f(x') = f(x)$).
+                Without sideways moves, search prematurely dies. With unrestricted sideways moves, the algorithm enters an infinite loop! Capping sideways steps (e.g. max 4) allows crossing shoulders to reach higher peaks.
+              </p>
+            </div>
+
+            <div
+              style={{
+                background: 'var(--lab-bg-obsidian)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--lab-border-active)',
+                padding: '1rem',
+              }}
+            >
+              {/* Controls */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {(
+                    [
+                      { id: 'disabled', label: 'Sideways Disabled' },
+                      { id: 'unlimited', label: 'Unlimited (Infinite Loop)' },
+                      { id: 'capped', label: 'Capped at 4 (Recommended)' },
+                    ] as const
+                  ).map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => {
+                        setP2SidewaysRule(m.id);
+                        setP2State(2);
+                        setP2SidewaysCount(0);
+                      }}
+                      className={`btn-tactile btn-xs ${p2SidewaysRule === m.id ? 'btn-primary' : ''}`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button onClick={stepP2} className="btn-tactile btn-sm btn-emerald">
+                    <Play size={14} />
+                    <span>Step Agent</span>
+                  </button>
+                  <button onClick={() => { setP2State(2); setP2SidewaysCount(0); }} className="btn-tactile btn-sm">
+                    <RotateCcw size={14} />
+                    <span>Reset</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 1D Terrain SVG */}
+              <div style={{ width: '100%', height: '170px' }}>
+                <svg viewBox="0 0 500 170" style={{ width: '100%', height: '100%' }}>
+                  <polyline
+                    fill="none"
+                    stroke="var(--lab-accent-amber)"
+                    strokeWidth="2.5"
+                    points={p2Terrain.map((v, i) => `${35 + (i / 8) * 430},${145 - ((v - 5) / 20) * 120}`).join(' ')}
+                  />
+
+                  {p2Terrain.map((v, i) => {
+                    const cx = 35 + (i / 8) * 430;
+                    const cy = 145 - ((v - 5) / 20) * 120;
+                    const isCur = i === p2State;
+
+                    return (
+                      <g key={i}>
+                        <circle cx={cx} cy={cy} r={isCur ? 7 : 3.5} fill={isCur ? 'var(--lab-accent-lime)' : '#64748b'} />
+                        <text x={cx} y="162" fill="var(--text-muted)" fontSize="8.5" textAnchor="middle" fontFamily="monospace">
+                          x={i}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {/* Shoulder bracket */}
+                  <line x1={35 + (2 / 8) * 430} y1="80" x2={35 + (4 / 8) * 430} y2="80" stroke="var(--lab-accent-cyan)" strokeWidth="1.5" strokeDasharray="3 2" />
+                  <text x={35 + (3 / 8) * 430} y="74" fill="var(--lab-accent-cyan)" fontSize="8.5" textAnchor="middle" fontFamily="monospace">
+                    Flat Shoulder (f=12)
+                  </text>
+                  <text x={35 + (7 / 8) * 430} y={145 - ((22 - 5) / 20) * 120 - 8} fill="var(--lab-accent-lime)" fontSize="8.5" textAnchor="middle" fontFamily="monospace" fontWeight="bold">
+                    Summit (f=22)
+                  </text>
+                </svg>
+              </div>
+            </div>
+
+            <div style={{ padding: '0.65rem 0.9rem', background: 'var(--lab-bg-surface)', borderRadius: '4px', borderLeft: '3px solid var(--lab-accent-amber)', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+              {p2Log}
+            </div>
+          </div>
+        )}
+
+        {/* PATHOLOGY 3: RIDGE (2D DIAGONAL PROBLEM) */}
+        {pathology === 'ridge' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div
+              style={{
+                background: 'var(--lab-bg-surface)',
+                padding: '1rem',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-subtle)',
+                fontSize: '0.82rem',
+                lineHeight: '1.5',
+              }}
+            >
+              <strong style={{ color: 'var(--lab-accent-cyan)' }}>Slide 17: Ridges (The 2D Diagonal Blindspot)</strong>
+              <p style={{ marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
+                A sequence of local optima where the ridge runs obliquely (e.g. along $y = x$).
+                Single-variable moves (North, South, East, West) step off the ridge into lower elevations, causing greedy search to freeze!
+                Only diagonal composite moves (e.g. North-East) or multi-variable neighborhood operators can advance up the ridge.
+              </p>
+            </div>
+
+            {/* 2D Grid Visualizer */}
+            <div
+              style={{
+                background: 'var(--lab-bg-obsidian)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--lab-border-active)',
+                padding: '1.25rem',
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 320px) 1fr', gap: '1.5rem', alignItems: 'center' }}>
+                {/* 6x6 2D Contour Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '4px', maxWidth: '300px' }}>
+                  {Array.from({ length: 6 }, (_, row) => 5 - row).map((y) =>
+                    Array.from({ length: 6 }, (_, x) => {
+                      const elev = getRidgeElevation(x, y);
+                      const isCurrent = ridgePos.x === x && ridgePos.y === y;
+                      const isRidgeLine = x === y;
+
+                      let bg = 'rgba(15, 23, 42, 0.7)';
+                      if (isRidgeLine) bg = `rgba(120, 213, 232, ${0.15 + (elev / 30) * 0.4})`;
+                      if (isCurrent) bg = 'var(--lab-accent-lime)';
+
+                      return (
+                        <div
+                          key={`${x}-${y}`}
+                          style={{
+                            height: '42px',
+                            background: bg,
+                            borderRadius: '4px',
+                            border: isCurrent
+                              ? '2px solid #fff'
+                              : isRidgeLine
+                              ? '1px solid var(--lab-accent-cyan)'
+                              : '1px solid rgba(255, 255, 255, 0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.65rem',
+                            fontFamily: 'monospace',
+                            color: isCurrent ? '#000' : isRidgeLine ? 'var(--lab-accent-cyan)' : 'var(--text-dim)',
+                            fontWeight: isCurrent || isRidgeLine ? 700 : 400,
+                          }}
+                        >
+                          <span>{isCurrent ? '●' : `${x},${y}`}</span>
+                          <span style={{ fontSize: '0.55rem', opacity: 0.8 }}>f={elev}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* D-Pad Controls */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Current Position: <strong>({ridgePos.x}, {ridgePos.y})</strong> | Elevation: <strong className="font-mono text-lime-400">f = {getRidgeElevation(ridgePos.x, ridgePos.y)}</strong>
+                  </div>
+
+                  {/* Directional Pad */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                    <button onClick={() => stepRidge('N')} className="btn-tactile btn-xs" style={{ width: '80px' }}>
+                      North (0, +1)
+                    </button>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      <button onClick={() => stepRidge('W')} className="btn-tactile btn-xs" style={{ width: '80px' }}>
+                        West (-1, 0)
+                      </button>
+                      <button onClick={() => stepRidge('E')} className="btn-tactile btn-xs" style={{ width: '80px' }}>
+                        East (+1, 0)
+                      </button>
+                    </div>
+                    <button onClick={() => stepRidge('S')} className="btn-tactile btn-xs" style={{ width: '80px' }}>
+                      South (0, -1)
+                    </button>
+                  </div>
+
+                  {/* 2-Variable Move Toggle */}
+                  <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-subtle)' }}>
+                    <button
+                      onClick={() => stepRidge('NE')}
+                      className="btn-tactile btn-sm btn-primary"
+                      style={{ width: '100%' }}
+                    >
+                      <ArrowRight size={14} style={{ transform: 'rotate(-45deg)' }} />
+                      <span>Diagonal 2-Var Move: North-East (+1, +1)</span>
+                    </button>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
+                      Notice how North and East both drop elevation, but North-East climbs along the crest!
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '0.65rem 0.9rem', background: 'var(--lab-bg-surface)', borderRadius: '4px', borderLeft: '3px solid var(--lab-accent-cyan)', fontSize: '0.78rem', fontFamily: 'monospace' }}>
+              {ridgeLog}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
