@@ -11,7 +11,8 @@ import {
   Sparkles,
   Info,
   ArrowRightLeft,
-  Play
+  Play,
+  Scale
 } from 'lucide-react';
 
 interface Job {
@@ -20,15 +21,16 @@ interface Job {
   time: number;
   color: string;
   border: string;
+  glow: string;
 }
 
 export const TwoProcessorVNSLab: React.FC = () => {
   const jobs: Job[] = [
-    { id: 1, name: 'J₁', time: 8, color: 'bg-indigo-500/20 text-indigo-300', border: 'border-indigo-500/40' },
-    { id: 2, name: 'J₂', time: 7, color: 'bg-cyan-500/20 text-cyan-300', border: 'border-cyan-500/40' },
-    { id: 3, name: 'J₃', time: 6, color: 'bg-amber-500/20 text-amber-300', border: 'border-amber-500/40' },
-    { id: 4, name: 'J₄', time: 5, color: 'bg-emerald-500/20 text-emerald-300', border: 'border-emerald-500/40' },
-    { id: 5, name: 'J₅', time: 4, color: 'bg-purple-500/20 text-purple-300', border: 'border-purple-500/40' },
+    { id: 1, name: 'J₁', time: 8, color: 'bg-indigo-500/20 text-indigo-300', border: 'border-indigo-500/50', glow: 'shadow-indigo-500/20' },
+    { id: 2, name: 'J₂', time: 7, color: 'bg-cyan-500/20 text-cyan-300', border: 'border-cyan-500/50', glow: 'shadow-cyan-500/20' },
+    { id: 3, name: 'J₃', time: 6, color: 'bg-amber-500/20 text-amber-300', border: 'border-amber-500/50', glow: 'shadow-amber-500/20' },
+    { id: 4, name: 'J₄', time: 5, color: 'bg-emerald-500/20 text-emerald-300', border: 'border-emerald-500/50', glow: 'shadow-emerald-500/20' },
+    { id: 5, name: 'J₅', time: 4, color: 'bg-purple-500/20 text-purple-300', border: 'border-purple-500/50', glow: 'shadow-purple-500/20' },
   ];
 
   // State: array of 5 binary variables (0 for P0, 1 for P1)
@@ -36,28 +38,28 @@ export const TwoProcessorVNSLab: React.FC = () => {
   const [config, setConfig] = useState<number[]>([1, 0, 1, 0, 0]);
   const [activeTab, setActiveTab] = useState<'interactive' | 'matrix' | 'trace' | 'exam'>('interactive');
   const [vnsK, setVnsK] = useState<number>(1);
-  const [selectedJobForSwap, setSelectedJobForSwap] = useState<number | null>(null);
+  const [selectedJob, setSelectedJob] = useState<number | null>(null);
 
-  // Guided proof trace step: 0 = initial, 1 = testing N1, 2 = trapped in N1, 3 = testing N2, 4 = global optimum
+  // Guided trace step (0..4)
   const [traceStep, setTraceStep] = useState<number>(0);
 
   const [vnsLog, setVnsLog] = useState<{ step: number; text: string; type: 'info' | 'fail' | 'success' }[]>([
     {
       step: 0,
-      text: 'Initialized at Slide 62 configuration x = (1, 0, 1, 0, 0). P₀=16h, P₁=14h (Makespan f=16h).',
+      text: 'Initialized at Slide 62 state x = (1, 0, 1, 0, 0). Workloads: P₀=16h, P₁=14h (Makespan f=16h).',
       type: 'info'
     }
   ]);
 
-  // Exam quiz interactive state
-  const [examAnswers, setExamAnswers] = useState<{
-    q1: string;
-    q2: string;
-    q3: string;
-  }>({ q1: '', q2: '', q3: '' });
+  // Exam quiz state
+  const [examAnswers, setExamAnswers] = useState<{ q1: string; q2: string; q3: string }>({
+    q1: '',
+    q2: '',
+    q3: ''
+  });
   const [examSubmitted, setExamSubmitted] = useState<boolean>(false);
 
-  // Compute workloads L0, L1 and makespan f(x)
+  // Compute workloads
   const computeWorkloads = (cfg: number[]) => {
     let l0 = 0;
     let l1 = 0;
@@ -101,8 +103,8 @@ export const TwoProcessorVNSLab: React.FC = () => {
     l1: number;
     maxLoad: number;
     delta: number;
-    i0: number;
-    i1: number;
+    j0: Job;
+    j1: Job;
   }[] = [];
 
   p0Indices.forEach((i0) => {
@@ -119,8 +121,8 @@ export const TwoProcessorVNSLab: React.FC = () => {
         l1: nl1,
         maxLoad: nMax,
         delta: nMax - maxLoad,
-        i0,
-        i1
+        j0: jobs[i0],
+        j1: jobs[i1]
       });
     });
   });
@@ -130,56 +132,53 @@ export const TwoProcessorVNSLab: React.FC = () => {
   // Apply move
   const handleApplyConfig = (newCfg: number[], reason: string, isImprovement = false) => {
     setConfig(newCfg);
-    setSelectedJobForSwap(null);
+    setSelectedJob(null);
     const { maxLoad: newMax } = computeWorkloads(newCfg);
     setVnsLog((prev) => [
       {
         step: prev.length + 1,
-        text: `${reason} ➜ New Makespan: ${newMax}h ${newMax === 15 ? '(PERFECT OPTIMUM!)' : ''}`,
+        text: `${reason} ➜ New Makespan: ${newMax}h ${newMax === 15 ? '(PERFECT OPTIMUM ACHIEVED!)' : ''}`,
         type: newMax === 15 ? 'success' : isImprovement ? 'info' : 'fail'
       },
-      ...prev.slice(0, 15)
+      ...prev.slice(0, 12)
     ]);
   };
 
-  // Click on a job in the Gantt chart: allows both single flip and pairwise swap
+  // Job selection and pairwise swap engine
   const handleJobClick = (jobIdx: number) => {
-    if (selectedJobForSwap === null) {
-      // First selection
-      setSelectedJobForSwap(jobIdx);
-    } else if (selectedJobForSwap === jobIdx) {
-      // Clicked same job again: deselect
-      setSelectedJobForSwap(null);
+    if (selectedJob === null) {
+      setSelectedJob(jobIdx);
+    } else if (selectedJob === jobIdx) {
+      setSelectedJob(null);
     } else {
-      // Clicked a second job
-      const pFirst = config[selectedJobForSwap];
+      const pFirst = config[selectedJob];
       const pSecond = config[jobIdx];
 
       if (pFirst !== pSecond) {
-        // Different processors: Pairwise swap (N2 operator!)
+        // Pairwise swap across processors (N2 move!)
         const nextCfg = [...config];
-        nextCfg[selectedJobForSwap] = pSecond;
+        nextCfg[selectedJob] = pSecond;
         nextCfg[jobIdx] = pFirst;
         handleApplyConfig(
           nextCfg,
-          `Pairwise Swap: ${jobs[selectedJobForSwap].name} (${jobs[selectedJobForSwap].time}h on P${pFirst}) ⟷ ${jobs[jobIdx].name} (${jobs[jobIdx].time}h on P${pSecond})`,
+          `Pairwise Swap: ${jobs[selectedJob].name} (${jobs[selectedJob].time}h on P${pFirst}) ⟷ ${jobs[jobIdx].name} (${jobs[jobIdx].time}h on P${pSecond})`,
           true
         );
       } else {
-        // Same processor: switch selection to second job
-        setSelectedJobForSwap(jobIdx);
+        // Same processor: switch selected job
+        setSelectedJob(jobIdx);
       }
     }
   };
 
-  // Flip selected job to other processor
-  const handleFlipSelected = () => {
-    if (selectedJobForSwap === null) return;
+  // Move selected job to other processor (N1 move)
+  const handleFlipSelectedJob = () => {
+    if (selectedJob === null) return;
     const nextCfg = [...config];
-    nextCfg[selectedJobForSwap] = 1 - nextCfg[selectedJobForSwap];
+    nextCfg[selectedJob] = 1 - nextCfg[selectedJob];
     handleApplyConfig(
       nextCfg,
-      `Single-Job Move: ${jobs[selectedJobForSwap].name} (${jobs[selectedJobForSwap].time}h) moved to P${nextCfg[selectedJobForSwap]}`
+      `Single-Job Move: ${jobs[selectedJob].name} (${jobs[selectedJob].time}h) moved to P${nextCfg[selectedJob]}`
     );
   };
 
@@ -209,7 +208,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
         setVnsLog((prev) => [
           {
             step: prev.length + 1,
-            text: `[k=1 / N₁] STRICT LOCAL MINIMUM! All 5 single-job flips yield worse makespans (18h to 24h). Escalating to k=2 (N₂: Pairwise Swaps).`,
+            text: `[k=1 / N₁] STRICT LOCAL MINIMUM! All 5 single-job flips yield worse makespans (18h..24h). Escalating to k=2 (N₂: Pairwise Swaps).`,
             type: 'fail'
           },
           ...prev
@@ -225,7 +224,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
         setVnsLog((prev) => [
           {
             step: prev.length + 1,
-            text: `[k=2 / N₂] No improvement found in N₂ either.`,
+            text: `[k=2 / N₂] No improvement found in N₂.`,
             type: 'fail'
           },
           ...prev
@@ -237,7 +236,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
   const handleResetSlideState = () => {
     setConfig([1, 0, 1, 0, 0]);
     setVnsK(1);
-    setSelectedJobForSwap(null);
+    setSelectedJob(null);
     setTraceStep(0);
     setVnsLog([
       {
@@ -250,7 +249,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
 
   return (
     <div className="visualizer-container border-cyan-500/30 shadow-2xl space-y-6">
-      {/* Visualizer Header */}
+      {/* Header */}
       <div className="visualizer-header border-b border-slate-800 pb-4">
         <div className="visualizer-title-area">
           <div className="flex items-center gap-2">
@@ -276,7 +275,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
             className="btn-tactile btn-primary text-xs flex items-center gap-1.5"
           >
             <SkipForward size={14} />
-            Auto Step VNS (k={vnsK})
+            Step VNS (k={vnsK})
           </button>
 
           <button
@@ -300,7 +299,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
           }`}
         >
           <Cpu size={14} />
-          Interactive Gantt & Swap Engine
+          Tactile Dual-Processor Racks & Swap Engine
         </button>
         <button
           onClick={() => setActiveTab('trace')}
@@ -311,7 +310,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
           }`}
         >
           <Play size={14} />
-          Step-by-Step Slide 62 Proof Trace
+          Guided Slide 62 Analytical Proof
         </button>
         <button
           onClick={() => setActiveTab('matrix')}
@@ -337,30 +336,35 @@ export const TwoProcessorVNSLab: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: INTERACTIVE GANTT & PAIRWISE SWAP ENGINE */}
+      {/* TAB 1: TACTILE DUAL PROCESSOR RACKS */}
       {activeTab === 'interactive' && (
         <div className="space-y-6">
-          {/* Workload Status Banner */}
+          {/* Workload Status Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800">
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Representation Vector x</span>
               <div className="text-xl font-mono font-bold text-cyan-400 mt-1 tracking-wider">
                 x = ({config.join(', ')})
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
-                Bit i: 0 = Processor P₀, 1 = Processor P₁
+              <div className="text-[11px] text-slate-500 mt-1 font-mono">
+                Job i: 0 = Processor P₀, 1 = Processor P₁
               </div>
             </div>
 
             <div className="p-3.5 bg-slate-900/80 rounded-xl border border-slate-800">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Processor Workloads</span>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <Scale size={13} className="text-amber-400" />
+                Processor Balance Gap
+              </span>
               <div className="flex items-baseline gap-3 mt-1 font-mono text-base">
                 <span className="text-cyan-300 font-bold">P₀ = {l0}h</span>
                 <span className="text-slate-600">|</span>
                 <span className="text-amber-300 font-bold">P₁ = {l1}h</span>
-                <span className="text-[11px] text-slate-400">(Gap: {Math.abs(l0 - l1)}h)</span>
+                <span className="text-[11px] text-slate-400">
+                  ({Math.abs(l0 - l1) === 0 ? 'Balanced' : `Imbalance: ${Math.abs(l0 - l1)}h`})
+                </span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">Total work = 30 hours (Optimal = 15h each)</div>
+              <div className="text-[11px] text-slate-500 mt-1 font-mono">Optimal target = 15h per processor</div>
             </div>
 
             <div
@@ -371,7 +375,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Makespan Objective f(x) = max(L₀, L₁)</span>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">Makespan f(x) = max(L₀, L₁)</span>
                 {maxLoad === 15 && (
                   <span className="badge badge-emerald text-[10px] font-bold">OPTIMUM</span>
                 )}
@@ -387,12 +391,12 @@ export const TwoProcessorVNSLab: React.FC = () => {
             </div>
           </div>
 
-          {/* Interactive Gantt Chart with Drag/Swap hint */}
+          {/* Dual Rack Visualizer */}
           <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-5">
             <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
               <span className="font-mono uppercase font-bold text-white tracking-wide flex items-center gap-1.5">
                 <Cpu size={14} className="text-cyan-400" />
-                Processor Gantt Schedules · Interactive Swap & Reassignment
+                Processor Workload Schedules (Click to Swap or Transfer)
               </span>
               <span className="text-[11px] font-mono text-amber-300 flex items-center gap-1">
                 <span className="w-2.5 h-0.5 bg-amber-400 inline-block" />
@@ -400,31 +404,31 @@ export const TwoProcessorVNSLab: React.FC = () => {
               </span>
             </div>
 
-            {/* Instruction banner for swap */}
+            {/* Interaction Instruction Banner */}
             <div className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
                 <ArrowRightLeft size={15} className="text-amber-400 shrink-0" />
-                {selectedJobForSwap === null ? (
+                {selectedJob === null ? (
                   <span className="text-slate-300">
-                    <strong>Pairwise Swap:</strong> Click any job on P₀, then click a job on P₁ to swap them!
+                    <strong>Swap Mode:</strong> Click any job on P₀, then click a job on P₁ to swap them!
                   </span>
                 ) : (
                   <span className="text-amber-300 font-mono">
-                    Selected <strong>{jobs[selectedJobForSwap].name} ({jobs[selectedJobForSwap].time}h on P{config[selectedJobForSwap]})</strong>. Now click a job on Processor P{1 - config[selectedJobForSwap]} to execute swap!
+                    Picked up <strong>{jobs[selectedJob].name} ({jobs[selectedJob].time}h on P{config[selectedJob]})</strong>. Now click any job on Processor P{1 - config[selectedJob]} to swap, or click Move!
                   </span>
                 )}
               </div>
 
-              {selectedJobForSwap !== null && (
+              {selectedJob !== null && (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleFlipSelected}
+                    onClick={handleFlipSelectedJob}
                     className="px-2.5 py-1 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 rounded text-[11px] font-bold hover:bg-cyan-500/30"
                   >
-                    Move to Other Processor (N₁)
+                    Move to P{1 - config[selectedJob]} (N₁)
                   </button>
                   <button
-                    onClick={() => setSelectedJobForSwap(null)}
+                    onClick={() => setSelectedJob(null)}
                     className="px-2 py-1 bg-slate-800 text-slate-400 hover:text-white rounded text-[11px]"
                   >
                     Cancel
@@ -433,7 +437,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
               )}
             </div>
 
-            {/* Processor 0 Timeline */}
+            {/* Rack P0 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-mono font-bold text-cyan-400 flex items-center gap-2">
@@ -444,11 +448,11 @@ export const TwoProcessorVNSLab: React.FC = () => {
                 </span>
               </div>
 
-              <div className="w-full bg-slate-900 h-14 rounded-xl p-1.5 border border-slate-800 relative flex overflow-hidden">
+              <div className="w-full bg-slate-900 h-16 rounded-xl p-2 border border-slate-800 relative flex overflow-hidden">
                 {/* 15h Target Marker Line */}
                 <div
                   className="absolute top-0 bottom-0 z-20 border-r-2 border-dashed border-amber-400 pointer-events-none"
-                  style={{ left: '50%' }}
+                  style={{ left: `${(15 / 30) * 100}%` }}
                 >
                   <span className="absolute -top-1 -right-3 text-[9px] font-mono font-bold text-amber-400 bg-slate-950 px-1 rounded shadow">
                     15h
@@ -459,13 +463,14 @@ export const TwoProcessorVNSLab: React.FC = () => {
                 {jobs.map((job, idx) => {
                   if (config[idx] !== 0) return null;
                   const widthPct = (job.time / 30) * 100;
-                  const isSelected = selectedJobForSwap === idx;
+                  const isSelected = selectedJob === idx;
+
                   return (
                     <button
                       key={job.id}
                       onClick={() => handleJobClick(idx)}
                       className={`h-full ${job.color} ${job.border} border-2 rounded-lg mx-0.5 flex flex-col items-center justify-center transition-all cursor-pointer relative ${
-                        isSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.02] z-30' : 'hover:brightness-125'
+                        isSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.03] z-30' : 'hover:brightness-125'
                       }`}
                       style={{ width: `${widthPct}%` }}
                       title={`Click to select ${job.name} (${job.time}h)`}
@@ -489,7 +494,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
               </div>
             </div>
 
-            {/* Processor 1 Timeline */}
+            {/* Rack P1 */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center text-xs">
                 <span className="font-mono font-bold text-amber-400 flex items-center gap-2">
@@ -500,11 +505,11 @@ export const TwoProcessorVNSLab: React.FC = () => {
                 </span>
               </div>
 
-              <div className="w-full bg-slate-900 h-14 rounded-xl p-1.5 border border-slate-800 relative flex overflow-hidden">
+              <div className="w-full bg-slate-900 h-16 rounded-xl p-2 border border-slate-800 relative flex overflow-hidden">
                 {/* 15h Target Marker Line */}
                 <div
                   className="absolute top-0 bottom-0 z-20 border-r-2 border-dashed border-amber-400 pointer-events-none"
-                  style={{ left: '50%' }}
+                  style={{ left: `${(15 / 30) * 100}%` }}
                 >
                   <span className="absolute -top-1 -right-3 text-[9px] font-mono font-bold text-amber-400 bg-slate-950 px-1 rounded shadow">
                     15h
@@ -515,13 +520,14 @@ export const TwoProcessorVNSLab: React.FC = () => {
                 {jobs.map((job, idx) => {
                   if (config[idx] !== 1) return null;
                   const widthPct = (job.time / 30) * 100;
-                  const isSelected = selectedJobForSwap === idx;
+                  const isSelected = selectedJob === idx;
+
                   return (
                     <button
                       key={job.id}
                       onClick={() => handleJobClick(idx)}
                       className={`h-full ${job.color} ${job.border} border-2 rounded-lg mx-0.5 flex flex-col items-center justify-center transition-all cursor-pointer relative ${
-                        isSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.02] z-30' : 'hover:brightness-125'
+                        isSelected ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-950 scale-[1.03] z-30' : 'hover:brightness-125'
                       }`}
                       style={{ width: `${widthPct}%` }}
                       title={`Click to select ${job.name} (${job.time}h)`}
@@ -702,14 +708,14 @@ export const TwoProcessorVNSLab: React.FC = () => {
                 <div className="leading-relaxed text-slate-300">
                   Neighborhood $N_2$ swaps 1 job on $P_0$ with 1 job on $P_1$. Since $P_0$ has 3 jobs and $P_1$ has 2 jobs, $|N_2(x)| = 3 \times 2 = 6$ possible swaps:
                   <div className="mt-2 space-y-1">
-                    <div>• Swap J₂(7) ⟷ J₁(8): P₀=17h, P₁=13h ➜ $f = 17$h ($\Delta = +1$)</div>
+                    <div>• Swap J₂(7) ⟷ J₁(8): P₀=17h, P₁=13h ➜ f = 17h (Δ = +1)</div>
                     <div className="p-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded text-emerald-300 font-bold">
                       ★ Swap J₂(7) ⟷ J₃(6): P₀ = 16 - 7 + 6 = 15h, P₁ = 14 - 6 + 7 = 15h ➜ f = 15h (GLOBAL OPTIMUM!)
                     </div>
-                    <div>• Swap J₄(5) ⟷ J₁(8): P₀=19h, P₁=11h ➜ $f = 19$h ($\Delta = +3$)</div>
-                    <div>• Swap J₄(5) ⟷ J₃(6): P₀=17h, P₁=13h ➜ $f = 17$h ($\Delta = +1$)</div>
-                    <div>• Swap J₅(4) ⟷ J₁(8): P₀=20h, P₁=10h ➜ $f = 20$h ($\Delta = +4$)</div>
-                    <div>• Swap J₅(4) ⟷ J₃(6): P₀=18h, P₁=12h ➜ $f = 18$h ($\Delta = +2$)</div>
+                    <div>• Swap J₄(5) ⟷ J₁(8): P₀=19h, P₁=11h ➜ f = 19h (Δ = +3)</div>
+                    <div>• Swap J₄(5) ⟷ J₃(6): P₀=17h, P₁=13h ➜ f = 17h (Δ = +1)</div>
+                    <div>• Swap J₅(4) ⟷ J₁(8): P₀=20h, P₁=10h ➜ f = 20h (Δ = +4)</div>
+                    <div>• Swap J₅(4) ⟷ J₃(6): P₀=18h, P₁=12h ➜ f = 18h (Δ = +2)</div>
                   </div>
                 </div>
               </div>
@@ -730,7 +736,7 @@ export const TwoProcessorVNSLab: React.FC = () => {
                   onClick={() => handleApplyConfig([1, 1, 0, 0, 0], 'Applied Swap J₂ ⟷ J₃ from Slide 62 Proof', true)}
                   className="btn-tactile btn-primary btn-sm text-xs mt-2"
                 >
-                  Apply Optimal Schedule to Interactive Gantt
+                  Apply Optimal Schedule to Interactive Racks
                 </button>
               </div>
             )}
