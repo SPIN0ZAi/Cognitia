@@ -13,7 +13,7 @@ import {
   Thermometer,
   Zap,
   Activity,
-  TrendingDown
+  Layers
 } from 'lucide-react';
 
 interface HistoryPoint {
@@ -23,7 +23,7 @@ interface HistoryPoint {
   type: 'improve' | 'escape' | 'reject';
 }
 
-interface LastMoveInfo {
+interface LastMoveRecord {
   step: number;
   from: number;
   candidate: number;
@@ -41,13 +41,16 @@ export const SimulatedAnnealingLab: React.FC = () => {
   const chartGradientId = useId();
   const glowFilterId = useId();
 
-  // Multimodal minimization landscape (25 discrete states, x in [0..24])
-  // Cost peaks at ends, local trap at x=5 (f=15), deeper trap at x=11 (f=12), global min at x=18 (f=4)
+  // Problem Mode: 1D Landscape vs TSP Permutation
+  const [problemMode, setProblemMode] = useState<'landscape' | 'tsp'>('landscape');
+
+  // Multimodal 1D minimization landscape (25 discrete states, x in [0..24])
+  // Peaks at ends, local trap at x=5 (f=15), deep trap at x=11 (f=12), global min at x=18 (f=4)
   const costLandscape = [
     32, 28, 24, 20, 16, 15, 17, 21, 26, 23, 17, 12, 16, 23, 29, 25, 17, 9, 4, 10, 16, 23, 28, 30, 33
   ];
 
-  // SA State
+  // 1D Landscape State
   const [currentIdx, setCurrentIdx] = useState<number>(3);
   const [bestIdx, setBestIdx] = useState<number>(3);
   const [temperature, setTemperature] = useState<number>(15.0);
@@ -57,10 +60,10 @@ export const SimulatedAnnealingLab: React.FC = () => {
   const [speed, setSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [stepCounter, setStepCounter] = useState<number>(0);
-  const [activeTab, setActiveTab] = useState<'landscape' | 'metropolis-sandbox' | 'prediction'>('landscape');
+  const [activeTab, setActiveTab] = useState<'simulator' | 'metropolis-sandbox' | 'prediction'>('simulator');
 
   // Trajectory history
-  const [lastMove, setLastMove] = useState<LastMoveInfo | null>(null);
+  const [lastMove, setLastMove] = useState<LastMoveRecord | null>(null);
   const [history, setHistory] = useState<HistoryPoint[]>([
     { step: 0, cost: costLandscape[3], temp: 15.0, type: 'improve' }
   ]);
@@ -75,7 +78,31 @@ export const SimulatedAnnealingLab: React.FC = () => {
   const [calcTemp, setCalcTemp] = useState<number>(10.0);
   const [calcDelta, setCalcDelta] = useState<number>(4.0);
 
-  // References for stable animation loop
+  // TSP Annealing Problem State (7 cities)
+  const tspCities = [
+    { id: 0, label: 'A', x: 80, y: 80 },
+    { id: 1, label: 'B', x: 220, y: 190 },
+    { id: 2, label: 'C', x: 340, y: 70 },
+    { id: 3, label: 'D', x: 380, y: 210 },
+    { id: 4, label: 'E', x: 250, y: 80 },
+    { id: 5, label: 'F', x: 120, y: 220 },
+  ];
+  const [tspTour, setTspTour] = useState<number[]>([0, 1, 2, 3, 4, 5]);
+
+  // Compute TSP tour distance
+  const computeTSPDistance = (t: number[]) => {
+    let sum = 0;
+    for (let i = 0; i < t.length; i++) {
+      const c1 = tspCities[t[i]];
+      const c2 = tspCities[t[(i + 1) % t.length]];
+      sum += Math.sqrt((c1.x - c2.x) ** 2 + (c1.y - c2.y) ** 2);
+    }
+    return Math.round(sum);
+  };
+
+  const tspDistance = computeTSPDistance(tspTour);
+
+  // References for tear-free animation loop
   const stateRef = useRef({
     currentIdx: 3,
     bestIdx: 3,
@@ -83,10 +110,11 @@ export const SimulatedAnnealingLab: React.FC = () => {
     alpha: 0.92,
     stepsPerTemp: 3,
     stepCounter: 0,
-    isRunning: false
+    isRunning: false,
+    problemMode: 'landscape' as 'landscape' | 'tsp',
+    tspTour: [0, 1, 2, 3, 4, 5]
   });
 
-  // Keep ref synchronized
   useEffect(() => {
     stateRef.current = {
       currentIdx,
@@ -95,102 +123,157 @@ export const SimulatedAnnealingLab: React.FC = () => {
       alpha,
       stepsPerTemp,
       stepCounter,
-      isRunning
+      isRunning,
+      problemMode,
+      tspTour
     };
-  }, [currentIdx, bestIdx, temperature, alpha, stepsPerTemp, stepCounter, isRunning]);
+  }, [currentIdx, bestIdx, temperature, alpha, stepsPerTemp, stepCounter, isRunning, problemMode, tspTour]);
 
   // Speed delay map
-  const speedDelay = speed === 'slow' ? 650 : speed === 'normal' ? 320 : 110;
+  const speedDelay = speed === 'slow' ? 650 : speed === 'normal' ? 300 : 100;
 
-  // Perform single SA iteration
-  const stepSA = (forceCandidate?: number) => {
-    const curState = stateRef.current;
-    if (curState.temperature < 0.15) {
+  // Single SA Step Execution
+  const stepSA = () => {
+    const cur = stateRef.current;
+    if (cur.temperature < 0.15) {
       setIsRunning(false);
       return;
     }
 
-    // Neighbors N(x) = {x-1, x+1}
-    const neighbors: number[] = [];
-    if (curState.currentIdx > 0) neighbors.push(curState.currentIdx - 1);
-    if (curState.currentIdx < costLandscape.length - 1) neighbors.push(curState.currentIdx + 1);
+    if (cur.problemMode === 'landscape') {
+      // 1D Landscape
+      const neighbors: number[] = [];
+      if (cur.currentIdx > 0) neighbors.push(cur.currentIdx - 1);
+      if (cur.currentIdx < costLandscape.length - 1) neighbors.push(cur.currentIdx + 1);
 
-    const candidate = forceCandidate !== undefined ? forceCandidate : neighbors[Math.floor(Math.random() * neighbors.length)];
-    const currentCost = costLandscape[curState.currentIdx];
-    const candidateCost = costLandscape[candidate];
-    const delta = candidateCost - currentCost; // Minimization: delta <= 0 is improvement
+      const candidate = neighbors[Math.floor(Math.random() * neighbors.length)];
+      const currentCost = costLandscape[cur.currentIdx];
+      const candidateCost = costLandscape[candidate];
+      const delta = candidateCost - currentCost; // Minimization: delta <= 0 is better
 
-    let accepted = false;
-    let prob = 1.0;
-    const roll = Math.random();
-    let reason = '';
-    let moveType: 'improve' | 'escape' | 'reject' = 'improve';
+      let accepted = false;
+      let prob = 1.0;
+      const roll = Math.random();
+      let reason = '';
+      let moveType: 'improve' | 'escape' | 'reject' = 'improve';
 
-    if (delta <= 0) {
-      accepted = true;
-      prob = 1.0;
-      moveType = 'improve';
-      reason = `Improvement (Δ = ${delta} ≤ 0): Deterministically accepted (P = 1.00).`;
-    } else {
-      prob = Math.exp(-delta / curState.temperature);
-      if (roll <= prob) {
+      if (delta <= 0) {
         accepted = true;
-        moveType = 'escape';
-        reason = `Metropolis escape: Roll ${roll.toFixed(3)} ≤ P(${prob.toFixed(3)}). Worsening move (+${delta}) accepted!`;
+        prob = 1.0;
+        moveType = 'improve';
+        reason = `Improvement (Δ = ${delta} ≤ 0): 100% deterministic acceptance.`;
       } else {
-        accepted = false;
-        moveType = 'reject';
-        reason = `Metropolis barrier: Roll ${roll.toFixed(3)} > P(${prob.toFixed(3)}). Worsening move rejected.`;
+        prob = Math.exp(-delta / cur.temperature);
+        if (roll <= prob) {
+          accepted = true;
+          moveType = 'escape';
+          reason = `Metropolis escape: Roll ${roll.toFixed(3)} ≤ P(${prob.toFixed(3)}). Worsening step accepted!`;
+        } else {
+          accepted = false;
+          moveType = 'reject';
+          reason = `Metropolis barrier: Roll ${roll.toFixed(3)} > P(${prob.toFixed(3)}). Worsening step rejected.`;
+        }
       }
-    }
 
-    const nextStep = curState.stepCounter + 1;
-    const record: LastMoveInfo = {
-      step: nextStep,
-      from: curState.currentIdx,
-      candidate,
-      fromCost: currentCost,
-      candCost: candidateCost,
-      delta,
-      temp: curState.temperature,
-      prob,
-      roll,
-      accepted,
-      reason
-    };
-
-    setLastMove(record);
-
-    let nextCurrent = curState.currentIdx;
-
-    if (accepted) {
-      nextCurrent = candidate;
-      setCurrentIdx(candidate);
-      if (candidateCost < costLandscape[curState.bestIdx]) {
-        setBestIdx(candidate);
-      }
-    }
-
-    // Cool temperature geometrically after L moves (Slide 50: at each T, perform L movements)
-    let nextTemp = curState.temperature;
-    if (nextStep % curState.stepsPerTemp === 0) {
-      nextTemp = Math.max(0.1, curState.temperature * curState.alpha);
-      setTemperature(nextTemp);
-    }
-    setStepCounter(nextStep);
-
-    setHistory((prev) => [
-      ...prev.slice(-35),
-      {
+      const nextStep = cur.stepCounter + 1;
+      const record: LastMoveRecord = {
         step: nextStep,
-        cost: costLandscape[nextCurrent],
-        temp: nextTemp,
-        type: moveType
+        from: cur.currentIdx,
+        candidate,
+        fromCost: currentCost,
+        candCost: candidateCost,
+        delta,
+        temp: cur.temperature,
+        prob,
+        roll,
+        accepted,
+        reason
+      };
+
+      setLastMove(record);
+
+      let nextCurrent = cur.currentIdx;
+      if (accepted) {
+        nextCurrent = candidate;
+        setCurrentIdx(candidate);
+        if (candidateCost < costLandscape[cur.bestIdx]) {
+          setBestIdx(candidate);
+        }
       }
-    ]);
+
+      // Cooling logic
+      let nextTemp = cur.temperature;
+      if (nextStep % cur.stepsPerTemp === 0) {
+        nextTemp = Math.max(0.1, cur.temperature * cur.alpha);
+        setTemperature(nextTemp);
+      }
+      setStepCounter(nextStep);
+
+      setHistory((prev) => [
+        ...prev.slice(-35),
+        { step: nextStep, cost: costLandscape[nextCurrent], temp: nextTemp, type: moveType }
+      ]);
+    } else {
+      // TSP Mode: 2-opt move under Simulated Annealing
+      const n = cur.tspTour.length;
+      const i = Math.floor(Math.random() * (n - 1));
+      const j = i + 1 + Math.floor(Math.random() * (n - 1 - i));
+
+      // Reverse subsegment from i+1 to j
+      const candidateTour = [...cur.tspTour];
+      let left = i + 1;
+      let right = j;
+      while (left < right) {
+        const tmp = candidateTour[left];
+        candidateTour[left] = candidateTour[right];
+        candidateTour[right] = tmp;
+        left++;
+        right--;
+      }
+
+      const curDist = computeTSPDistance(cur.tspTour);
+      const candDist = computeTSPDistance(candidateTour);
+      const delta = candDist - curDist;
+
+      let accepted = false;
+      let prob = 1.0;
+      const roll = Math.random();
+
+      if (delta <= 0) {
+        accepted = true;
+        prob = 1.0;
+      } else {
+        prob = Math.exp(-delta / (cur.temperature * 10)); // Scaled for TSP distances
+        accepted = roll <= prob;
+      }
+
+      const nextStep = cur.stepCounter + 1;
+      let nextTour = cur.tspTour;
+      if (accepted) {
+        nextTour = candidateTour;
+        setTspTour(candidateTour);
+      }
+
+      let nextTemp = cur.temperature;
+      if (nextStep % cur.stepsPerTemp === 0) {
+        nextTemp = Math.max(0.1, cur.temperature * cur.alpha);
+        setTemperature(nextTemp);
+      }
+      setStepCounter(nextStep);
+
+      setHistory((prev) => [
+        ...prev.slice(-35),
+        {
+          step: nextStep,
+          cost: computeTSPDistance(nextTour),
+          temp: nextTemp,
+          type: delta <= 0 ? 'improve' : accepted ? 'escape' : 'reject'
+        }
+      ]);
+    }
   };
 
-  // Run loop with ref to avoid interval tearing
+  // Run loop
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     if (isRunning) {
@@ -216,6 +299,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
     setInitialTemp(newInitialT);
     setStepCounter(0);
     setLastMove(null);
+    setTspTour([0, 1, 2, 3, 4, 5]);
     setHistory([{ step: 0, cost: costLandscape[newStart], temp: newInitialT, type: 'improve' }]);
     setPendingCandidate(null);
     setUserPrediction(null);
@@ -261,7 +345,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
         : `Not quite. Candidate x'=${pendingCandidate} has Δ=${delta > 0 ? `+${delta}` : delta}. With T=${temperature.toFixed(2)}, P=${prob.toFixed(3)} and roll=${roll.toFixed(3)} → ${actualAccepted ? 'Accepted' : 'Rejected'}.`
     );
 
-    stepSA(pendingCandidate);
+    stepSA();
     setPendingCandidate(null);
   };
 
@@ -269,8 +353,8 @@ export const SimulatedAnnealingLab: React.FC = () => {
   const getPhaseInfo = (t: number) => {
     if (t > 8.0) {
       return {
-        label: 'High Temperature (Hot Plasma)',
-        desc: 'Metropolis accepts almost any uphill climb. Global exploration dominates.',
+        label: 'Hot Liquid Plasma',
+        desc: 'Wide thermal motion. Metropolis accepts almost any worsening climb (exploration dominates).',
         color: 'text-amber-400',
         bg: 'bg-amber-500/10 border-amber-500/30',
         icon: Flame
@@ -278,16 +362,16 @@ export const SimulatedAnnealingLab: React.FC = () => {
     }
     if (t > 1.5) {
       return {
-        label: 'Medium Temperature (Annealing)',
-        desc: 'Selective uphill jumping. Escapes shallow local traps while concentrating in promising basins.',
+        label: 'Annealing Transition',
+        desc: 'Selective barrier leaps. Escapes local minima while condensing into high-quality valleys.',
         color: 'text-cyan-400',
         bg: 'bg-cyan-500/10 border-cyan-500/30',
         icon: Zap
       };
     }
     return {
-      label: 'Frozen / Convergence Phase',
-      desc: 'T → 0. Behaves almost purely like Greedy Hill Climbing (downhill moves only).',
+      label: 'Crystalline Freezing',
+      desc: 'T → 0. Converges to pure greedy Hill Climbing (downhill moves only).',
       color: 'text-blue-400',
       bg: 'bg-blue-500/10 border-blue-500/30',
       icon: Snowflake
@@ -297,14 +381,13 @@ export const SimulatedAnnealingLab: React.FC = () => {
   const phase = getPhaseInfo(temperature);
   const PhaseIcon = phase.icon;
 
-  // Temperature color for climber ball
   const getClimberColor = (t: number) => {
-    if (t > 8) return '#f59e0b'; // Amber hot
-    if (t > 3) return '#06b6d4'; // Cyan warm
-    return '#3b82f6'; // Blue freezing
+    if (t > 8) return '#f59e0b';
+    if (t > 3) return '#06b6d4';
+    return '#3b82f6';
   };
 
-  // Metropolis sandbox calculation
+  // Sandbox calculations
   const sandboxProb = calcDelta <= 0 ? 1.0 : Math.exp(-calcDelta / calcTemp);
 
   return (
@@ -323,7 +406,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
             Simulated Annealing & The Metropolis Criterion
           </h3>
           <p className="visualizer-subtitle text-xs text-slate-400 mt-1 max-w-2xl">
-            Watch how Kirkpatrick's thermodynamic cooling accepts worsening moves (P = exp(-Δ/T)) to escape local minima traps at high T, smoothly freezing into the global optimum as T → 0.
+            Simulates the metallurgical cooling of molten metal. By accepting worsening transitions with probability $P = \exp(-\Delta / T)$, the algorithm boldly jumps over barriers at high temperatures, freezing into the global optimum as $T \to 0$.
           </p>
         </div>
 
@@ -334,7 +417,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
               <button
                 key={spd}
                 onClick={() => setSpeed(spd)}
-                className={`px-2.5 py-1 rounded capitalize font-medium transition-colors ${
+                className={`px-2 py-1 rounded capitalize font-medium transition-colors ${
                   speed === spd ? 'bg-amber-500/20 text-amber-300 font-bold' : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -352,11 +435,11 @@ export const SimulatedAnnealingLab: React.FC = () => {
           >
             {isRunning ? (
               <>
-                <Pause size={14} /> Pause
+                <Pause size={14} /> Pause Cooling
               </>
             ) : (
               <>
-                <Play size={14} /> Cool & Run
+                <Play size={14} /> Cool & Run (T₀={initialTemp})
               </>
             )}
           </button>
@@ -381,15 +464,15 @@ export const SimulatedAnnealingLab: React.FC = () => {
       {/* Tabs */}
       <div className="flex border-b border-slate-800 gap-2">
         <button
-          onClick={() => setActiveTab('landscape')}
+          onClick={() => setActiveTab('simulator')}
           className={`px-4 py-2 text-xs font-semibold rounded-t-lg transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === 'landscape'
+            activeTab === 'simulator'
               ? 'border-amber-400 text-amber-400 bg-amber-500/10'
               : 'border-transparent text-slate-400 hover:text-slate-200'
           }`}
         >
           <Activity size={14} />
-          Continuous Cost Landscape & History
+          Thermodynamic Simulation Laboratory
         </button>
         <button
           onClick={() => setActiveTab('metropolis-sandbox')}
@@ -415,57 +498,61 @@ export const SimulatedAnnealingLab: React.FC = () => {
         </button>
       </div>
 
-      {/* TAB 1: LANDSCAPE OPTIMIZATION & HISTORY */}
-      {activeTab === 'landscape' && (
+      {/* TAB 1: THERMODYNAMIC SIMULATION */}
+      {activeTab === 'simulator' && (
         <div className="space-y-5">
           {/* Top Info Bar */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            {/* Temperature Status */}
+            {/* Temperature Thermometer Indicator */}
             <div className={`p-3 rounded-xl border ${phase.bg} flex flex-col justify-between`}>
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1">
                   <PhaseIcon size={14} className={phase.color} />
-                  Phase
+                  Thermal State
                 </span>
                 <span className={`text-xs font-bold font-mono ${phase.color}`}>{phase.label.split(' ')[0]}</span>
               </div>
               <div className="mt-2">
                 <div className="flex justify-between items-baseline mb-1">
                   <span className="text-xs text-slate-400 font-mono">Temp T:</span>
-                  <span className="text-lg font-bold font-mono text-white">{temperature.toFixed(2)}</span>
+                  <span className="text-xl font-bold font-mono text-white">{temperature.toFixed(2)}</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden p-0.5 border border-slate-700">
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-amber-500 transition-all duration-300"
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 via-cyan-400 to-amber-500 transition-all duration-300"
                     style={{ width: `${Math.min(100, (temperature / initialTemp) * 100)}%` }}
                   />
                 </div>
                 <div className="text-[10px] text-slate-500 font-mono mt-1 flex justify-between">
-                  <span>Steps at this T:</span>
-                  <span className="text-slate-300">{(stepCounter % stepsPerTemp) + 1} / {stepsPerTemp}</span>
+                  <span>Chain: {(stepCounter % stepsPerTemp) + 1} / {stepsPerTemp} moves</span>
+                  <span className="text-slate-400">T_next: {(temperature * alpha).toFixed(2)}</span>
                 </div>
               </div>
             </div>
 
-            {/* Current State Card */}
+            {/* Current Position / Energy */}
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Current Position</span>
+              <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Current Energy</span>
               <div className="mt-1 flex items-baseline justify-between">
                 <div>
-                  <span className="text-xl font-mono font-bold text-cyan-400">x = {currentIdx}</span>
+                  <span className="text-xl font-mono font-bold text-cyan-400">
+                    {problemMode === 'landscape' ? `x = ${currentIdx}` : `Tour`}
+                  </span>
                   <div className="text-[11px] text-slate-400 font-mono">
-                    Cost f(x) = <strong className="text-white">{costLandscape[currentIdx]}</strong>
+                    Cost = <strong className="text-white">{problemMode === 'landscape' ? costLandscape[currentIdx] : tspDistance}</strong>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] uppercase font-mono text-slate-500">Total Steps</span>
+                  <span className="text-[10px] uppercase font-mono text-slate-500">Steps</span>
                   <div className="text-sm font-mono text-slate-300">{stepCounter}</div>
                 </div>
               </div>
-              <span className="text-[10px] text-slate-500 font-mono mt-1">Click any terrain point to drop agent</span>
+              <span className="text-[10px] text-slate-500 font-mono mt-1">
+                {problemMode === 'landscape' ? 'Target: Global Min x=18 (f=4)' : 'Target: Crossing-free tour'}
+              </span>
             </div>
 
-            {/* Best Found Card */}
+            {/* Best Found State */}
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
               <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1">
                 <Sparkles size={13} className="text-emerald-400" />
@@ -473,7 +560,9 @@ export const SimulatedAnnealingLab: React.FC = () => {
               </span>
               <div className="mt-1 flex items-baseline justify-between">
                 <div>
-                  <span className="text-xl font-mono font-bold text-emerald-400">x* = {bestIdx}</span>
+                  <span className="text-xl font-mono font-bold text-emerald-400">
+                    {problemMode === 'landscape' ? `x* = ${bestIdx}` : `Optimal Tour`}
+                  </span>
                   <div className="text-[11px] text-slate-400 font-mono">
                     Best Cost = <strong className="text-emerald-300">{costLandscape[bestIdx]}</strong>
                   </div>
@@ -482,13 +571,13 @@ export const SimulatedAnnealingLab: React.FC = () => {
                   <span className="badge badge-emerald text-[10px] font-bold">GLOBAL OPTIMUM</span>
                 )}
               </div>
-              <span className="text-[10px] text-slate-500 font-mono mt-1">Target: x=18 with f*=4</span>
+              <span className="text-[10px] text-slate-500 font-mono mt-1">Retained throughout run</span>
             </div>
 
-            {/* Cooling Schedule & Chain Length */}
+            {/* Hyperparameters Configuration */}
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
               <div className="flex justify-between items-center text-xs text-slate-400 mb-0.5">
-                <span>Cooling Rate (α):</span>
+                <span>Cooling Schedule (α):</span>
                 <span className="font-mono text-amber-400 font-bold">{alpha.toFixed(2)}</span>
               </div>
               <input
@@ -502,8 +591,8 @@ export const SimulatedAnnealingLab: React.FC = () => {
               />
 
               <div className="flex justify-between items-center text-xs text-slate-400 mt-1 mb-0.5">
-                <span>Moves per T (L):</span>
-                <span className="font-mono text-cyan-400 font-bold">{stepsPerTemp}</span>
+                <span>Markov Chain (L):</span>
+                <span className="font-mono text-cyan-400 font-bold">{stepsPerTemp} steps</span>
               </div>
               <input
                 type="range"
@@ -524,7 +613,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
                     handleReset(3, 8.0);
                   }}
                   className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[9px] font-medium text-slate-300 rounded border border-slate-700 truncate"
-                  title="Fast Quench: Freezes rapidly, trapped in local valley x=11"
+                  title="Fast Quench: Freezes prematurely into local trap at x=11"
                 >
                   Fast Quench (Trap)
                 </button>
@@ -536,7 +625,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
                     handleReset(3, 18.0);
                   }}
                   className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-[9px] font-medium text-amber-300 rounded border border-amber-500/30 truncate"
-                  title="Slow Anneal: Long Markov chains escape local minima"
+                  title="Slow Anneal: Climbs out of local traps into global minimum"
                 >
                   Slow Anneal (Optimum)
                 </button>
@@ -544,277 +633,345 @@ export const SimulatedAnnealingLab: React.FC = () => {
             </div>
           </div>
 
-          {/* SVG Minimization Landscape */}
-          <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800/80 relative overflow-hidden shadow-inner">
-            <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 mb-3 gap-2">
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-white uppercase text-[11px] tracking-wide">
-                  Energy Landscape: Cost f(x)
-                </span>
-                <span className="text-[11px] text-slate-500">(Minimization: lower elevation is superior)</span>
-              </div>
-
-              {/* Legend */}
-              <div className="flex items-center gap-4 text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-cyan-400 border border-white inline-block animate-pulse" />
-                  <span className="text-slate-300">Current State x</span>
-                </div>
-                {lastMove && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full border-2 border-dashed border-amber-400 inline-block" />
-                    <span className="text-amber-300">Candidate x'</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-                  <span className="text-slate-400">Local Trap x=11 (f=12)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
-                  <span className="text-emerald-300 font-semibold">Global Minimum x=18 (f=4)</span>
-                </div>
-              </div>
+          {/* Problem Selector Toggle */}
+          <div className="flex items-center justify-between p-2 bg-slate-900 rounded-xl border border-slate-800">
+            <span className="text-xs font-mono font-bold text-slate-300 flex items-center gap-2 pl-2">
+              <Layers size={14} className="text-cyan-400" />
+              Benchmark Domain:
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setProblemMode('landscape');
+                  setIsRunning(false);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                  problemMode === 'landscape'
+                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                    : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
+              >
+                1D Multimodal Potential Landscape
+              </button>
+              <button
+                onClick={() => {
+                  setProblemMode('tsp');
+                  setIsRunning(false);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
+                  problemMode === 'tsp'
+                    ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                    : 'bg-slate-950 text-slate-400 hover:text-white'
+                }`}
+              >
+                TSP Combinatorial Optimization (2-opt Annealing)
+              </button>
             </div>
+          </div>
 
-            {/* SVG Visualizer */}
-            <div className="w-full h-64 relative">
-              <svg className="w-full h-full" viewBox="0 0 920 220" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id={chartGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
-                    <stop offset="60%" stopColor="#06b6d4" stopOpacity="0.1" />
-                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
-                  </linearGradient>
+          {/* Problem Visualization Stage */}
+          {problemMode === 'landscape' ? (
+            /* 1D Landscape Visualizer */
+            <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800/80 relative overflow-hidden shadow-inner">
+              <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 mb-3 gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-white uppercase text-[11px] tracking-wide">
+                    Energy Landscape: Cost f(x)
+                  </span>
+                  <span className="text-[11px] text-slate-500">(Minimization: lower elevation is superior)</span>
+                </div>
 
-                  <filter id={glowFilterId} x="-20%" y="-20%" width="140%" height="140%">
-                    <feGaussianBlur stdDeviation="4" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                  </filter>
-                </defs>
+                <div className="flex items-center gap-4 text-[11px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-cyan-400 border border-white inline-block animate-pulse" />
+                    <span className="text-slate-300">State x</span>
+                  </div>
+                  {lastMove && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full border-2 border-dashed border-amber-400 inline-block" />
+                      <span className="text-amber-300">Candidate x'</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                    <span className="text-slate-400">Local Trap x=11 (f=12)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block" />
+                    <span className="text-emerald-300 font-semibold">Global Minimum x=18 (f=4)</span>
+                  </div>
+                </div>
+              </div>
 
-                {/* Grid guidelines */}
-                {[10, 20, 30].map((costVal) => {
-                  const y = 190 - costVal * 4.8;
-                  return (
-                    <g key={costVal}>
-                      <line x1="30" y1={y} x2="890" y2={y} stroke="#1e293b" strokeDasharray="3,3" strokeWidth="1" />
-                      <text x="22" y={y + 3} textAnchor="end" className="text-[9px] fill-slate-600 font-mono">
-                        {costVal}
-                      </text>
-                    </g>
-                  );
-                })}
+              {/* SVG Visualizer */}
+              <div className="w-full h-64 relative">
+                <svg className="w-full h-full" viewBox="0 0 920 220" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id={chartGradientId} x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.25" />
+                      <stop offset="60%" stopColor="#06b6d4" stopOpacity="0.1" />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
+                    </linearGradient>
 
-                {/* Shaded Area Under Terrain */}
-                <path
-                  d={`M 35 190 ${costLandscape
-                    .map((cost, idx) => `L ${35 + idx * 35.4} ${190 - cost * 4.8}`)
-                    .join(' ')} L ${35 + 24 * 35.4} 190 Z`}
-                  fill={`url(#${chartGradientId})`}
-                />
+                    <filter id={glowFilterId} x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="4" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
 
-                {/* Spline Surface Line */}
-                <polyline
-                  points={costLandscape.map((cost, idx) => `${35 + idx * 35.4},${190 - cost * 4.8}`).join(' ')}
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
+                  {/* Grid lines */}
+                  {[10, 20, 30].map((costVal) => {
+                    const y = 190 - costVal * 4.8;
+                    return (
+                      <g key={costVal}>
+                        <line x1="30" y1={y} x2="890" y2={y} stroke="#1e293b" strokeDasharray="3,3" strokeWidth="1" />
+                        <text x="22" y={y + 3} textAnchor="end" className="text-[9px] fill-slate-600 font-mono">
+                          {costVal}
+                        </text>
+                      </g>
+                    );
+                  })}
 
-                {/* Candidate Proposed Jump Arc */}
-                {lastMove && (
-                  <g>
-                    <path
-                      d={`M ${35 + lastMove.from * 35.4} ${190 - lastMove.fromCost * 4.8} Q ${
-                        35 + ((lastMove.from + lastMove.candidate) / 2) * 35.4
-                      } ${Math.min(190 - lastMove.fromCost * 4.8, 190 - lastMove.candCost * 4.8) - 30} ${
-                        35 + lastMove.candidate * 35.4
-                      } ${190 - lastMove.candCost * 4.8}`}
-                      fill="none"
-                      stroke={lastMove.accepted ? '#10b981' : '#f43f5e'}
-                      strokeWidth="2"
-                      strokeDasharray="4,4"
-                    />
-                  </g>
-                )}
+                  {/* Shaded Area Under Terrain */}
+                  <path
+                    d={`M 35 190 ${costLandscape
+                      .map((cost, idx) => `L ${35 + idx * 35.4} ${190 - cost * 4.8}`)
+                      .join(' ')} L ${35 + 24 * 35.4} 190 Z`}
+                    fill={`url(#${chartGradientId})`}
+                  />
 
-                {/* Vertical Drop-lines and Node Markers */}
-                {costLandscape.map((cost, idx) => {
-                  const cx = 35 + idx * 35.4;
-                  const cy = 190 - cost * 4.8;
-                  const isCurrent = idx === currentIdx;
-                  const isBest = idx === bestIdx;
-                  const isGlobal = idx === 18;
-                  const isTrap = idx === 11;
-                  const isLocal1 = idx === 5;
-                  const isCandidate = lastMove?.candidate === idx;
+                  {/* Spline Surface Line */}
+                  <polyline
+                    points={costLandscape.map((cost, idx) => `${35 + idx * 35.4},${190 - cost * 4.8}`).join(' ')}
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
 
-                  return (
-                    <g key={idx} className="cursor-pointer group" onClick={() => handleReset(idx)}>
-                      {/* Clickable hit box */}
-                      <rect x={cx - 16} y={15} width={32} height={190} fill="transparent" />
-
-                      {/* Drop line */}
-                      <line
-                        x1={cx}
-                        y1={cy}
-                        x2={cx}
-                        y2={195}
-                        stroke={isCurrent ? '#06b6d4' : isCandidate ? '#f59e0b' : '#1e293b'}
-                        strokeDasharray={isCurrent ? 'none' : '2,2'}
-                        strokeWidth={isCurrent || isCandidate ? 1.5 : 1}
+                  {/* Candidate Jump Arc */}
+                  {lastMove && (
+                    <g>
+                      <path
+                        d={`M ${35 + lastMove.from * 35.4} ${190 - lastMove.fromCost * 4.8} Q ${
+                          35 + ((lastMove.from + lastMove.candidate) / 2) * 35.4
+                        } ${Math.min(190 - lastMove.fromCost * 4.8, 190 - lastMove.candCost * 4.8) - 30} ${
+                          35 + lastMove.candidate * 35.4
+                        } ${190 - lastMove.candCost * 4.8}`}
+                        fill="none"
+                        stroke={lastMove.accepted ? '#10b981' : '#f43f5e'}
+                        strokeWidth="2"
+                        strokeDasharray="4,4"
                       />
+                    </g>
+                  )}
 
-                      {/* Candidate reticle */}
-                      {isCandidate && !isCurrent && (
+                  {/* Nodes */}
+                  {costLandscape.map((cost, idx) => {
+                    const cx = 35 + idx * 35.4;
+                    const cy = 190 - cost * 4.8;
+                    const isCurrent = idx === currentIdx;
+                    const isBest = idx === bestIdx;
+                    const isGlobal = idx === 18;
+                    const isTrap = idx === 11;
+                    const isLocal1 = idx === 5;
+                    const isCandidate = lastMove?.candidate === idx;
+
+                    return (
+                      <g key={idx} className="cursor-pointer group" onClick={() => handleReset(idx)}>
+                        <rect x={cx - 16} y={15} width={32} height={190} fill="transparent" />
+
+                        <line
+                          x1={cx}
+                          y1={cy}
+                          x2={cx}
+                          y2={195}
+                          stroke={isCurrent ? '#06b6d4' : isCandidate ? '#f59e0b' : '#1e293b'}
+                          strokeDasharray={isCurrent ? 'none' : '2,2'}
+                          strokeWidth={isCurrent || isCandidate ? 1.5 : 1}
+                        />
+
+                        {isCandidate && !isCurrent && (
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={12}
+                            fill="none"
+                            stroke={lastMove?.accepted ? '#10b981' : '#f43f5e'}
+                            strokeWidth="2"
+                            strokeDasharray="3,3"
+                          />
+                        )}
+
                         <circle
                           cx={cx}
                           cy={cy}
-                          r={12}
-                          fill="none"
-                          stroke={lastMove?.accepted ? '#10b981' : '#f43f5e'}
-                          strokeWidth="2"
-                          strokeDasharray="3,3"
+                          r={isCurrent ? 8 : isGlobal ? 6 : isTrap || isLocal1 ? 5 : 3.5}
+                          fill={
+                            isCurrent
+                              ? getClimberColor(temperature)
+                              : isGlobal
+                              ? '#34d399'
+                              : isTrap
+                              ? '#f43f5e'
+                              : isBest
+                              ? '#fbbf24'
+                              : '#475569'
+                          }
+                          stroke={isCurrent ? '#ffffff' : '#0f172a'}
+                          strokeWidth={isCurrent ? 2.5 : 1.5}
+                          filter={isCurrent ? `url(#${glowFilterId})` : undefined}
                         />
+
+                        <text x={cx} y={208} textAnchor="middle" className="text-[10px] fill-slate-500 font-mono">
+                          {idx}
+                        </text>
+
+                        {(isCurrent || isGlobal || isTrap || isLocal1 || isCandidate) && (
+                          <g>
+                            <rect
+                              x={cx - 14}
+                              y={cy - 24}
+                              width={28}
+                              height={15}
+                              rx={4}
+                              fill="#090d16"
+                              stroke={isCurrent ? '#06b6d4' : isCandidate ? '#f59e0b' : isGlobal ? '#10b981' : '#334155'}
+                              strokeWidth={1}
+                            />
+                            <text
+                              x={cx}
+                              y={cy - 13}
+                              textAnchor="middle"
+                              className={`text-[9px] font-mono font-bold ${
+                                isCurrent ? 'fill-cyan-300' : isCandidate ? 'fill-amber-300' : isGlobal ? 'fill-emerald-400' : 'fill-slate-300'
+                              }`}
+                            >
+                              {cost}
+                            </text>
+                          </g>
+                        )}
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+
+              {/* Live Decision Bar */}
+              <div className="mt-4 p-3.5 bg-slate-900 rounded-xl border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                <div>
+                  <div className="text-[10px] uppercase font-mono text-slate-500 mb-1">Last Transition Proposed</div>
+                  {lastMove ? (
+                    <div className="font-mono text-xs text-slate-300">
+                      <span className="text-cyan-400 font-bold">x={lastMove.from}</span> (f={lastMove.fromCost}) ➜{' '}
+                      <span className="text-amber-400 font-bold">x'={lastMove.candidate}</span> (f={lastMove.candCost})
+                      <div className="mt-0.5">
+                        <span className={lastMove.delta <= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                          Energy Δ = {lastMove.delta > 0 ? `+${lastMove.delta}` : lastMove.delta}
+                        </span>{' '}
+                        <span className="text-slate-500 text-[11px]">
+                          ({lastMove.delta <= 0 ? 'Downhill improvement' : 'Uphill worsening'})
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-slate-500 font-mono text-xs">Ready. Click 'Cool & Run' or 'Single Step'.</div>
+                  )}
+                </div>
+
+                <div className="border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4">
+                  <div className="text-[10px] uppercase font-mono text-slate-500 mb-1">Metropolis Acceptance Formula</div>
+                  {lastMove ? (
+                    <div className="font-mono text-xs">
+                      {lastMove.delta <= 0 ? (
+                        <span className="text-emerald-400 font-semibold">P(accept) = 1.00 (100% Guaranteed)</span>
+                      ) : (
+                        <div>
+                          <span className="text-slate-300">
+                            P = exp(-{lastMove.delta} / {lastMove.temp.toFixed(2)}) ={' '}
+                            <strong className="text-amber-300">{lastMove.prob.toFixed(4)}</strong>
+                          </span>
+                          <div className="text-[11px] text-slate-400">
+                            Random roll <strong className="text-white">{lastMove.roll.toFixed(4)}</strong> vs P:
+                          </div>
+                        </div>
                       )}
+                    </div>
+                  ) : (
+                    <div className="text-slate-500 font-mono text-xs">P(accept) = exp(-Δ / T) for worsening Δ &gt; 0</div>
+                  )}
+                </div>
 
-                      {/* Terrain node circle */}
-                      <circle
-                        cx={cx}
-                        cy={cy}
-                        r={isCurrent ? 8 : isGlobal ? 6 : isTrap || isLocal1 ? 5 : 3.5}
-                        fill={
-                          isCurrent
-                            ? getClimberColor(temperature)
-                            : isGlobal
-                            ? '#34d399'
-                            : isTrap
-                            ? '#f43f5e'
-                            : isBest
-                            ? '#fbbf24'
-                            : '#475569'
-                        }
-                        stroke={isCurrent ? '#ffffff' : '#0f172a'}
-                        strokeWidth={isCurrent ? 2.5 : 1.5}
-                        filter={isCurrent ? `url(#${glowFilterId})` : undefined}
-                      />
-
-                      {/* Node index label */}
-                      <text x={cx} y={208} textAnchor="middle" className="text-[10px] fill-slate-500 font-mono">
-                        {idx}
-                      </text>
-
-                      {/* Cost value tag */}
-                      {(isCurrent || isGlobal || isTrap || isLocal1 || isCandidate) && (
-                        <g>
-                          <rect
-                            x={cx - 14}
-                            y={cy - 24}
-                            width={28}
-                            height={15}
-                            rx={4}
-                            fill="#090d16"
-                            stroke={isCurrent ? '#06b6d4' : isCandidate ? '#f59e0b' : isGlobal ? '#10b981' : '#334155'}
-                            strokeWidth={1}
-                          />
-                          <text
-                            x={cx}
-                            y={cy - 13}
-                            textAnchor="middle"
-                            className={`text-[9px] font-mono font-bold ${
-                              isCurrent ? 'fill-cyan-300' : isCandidate ? 'fill-amber-300' : isGlobal ? 'fill-emerald-400' : 'fill-slate-300'
-                            }`}
-                          >
-                            {cost}
-                          </text>
-                        </g>
+                <div className="border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4 flex flex-col justify-center">
+                  <div className="text-[10px] uppercase font-mono text-slate-500 mb-1">Outcome</div>
+                  {lastMove ? (
+                    <div className="flex items-center gap-2">
+                      {lastMove.accepted ? (
+                        <span className="badge badge-emerald flex items-center gap-1 text-xs">
+                          <CheckCircle2 size={13} />
+                          ACCEPTED
+                        </span>
+                      ) : (
+                        <span className="badge badge-rose flex items-center gap-1 text-xs">
+                          <XCircle size={13} />
+                          REJECTED
+                        </span>
                       )}
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
-
-            {/* Last Step Metropolis Decision Bar */}
-            <div className="mt-4 p-3.5 bg-slate-900 rounded-xl border border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-              <div>
-                <div className="text-[10px] uppercase font-mono text-slate-500 mb-1">Last Transition Proposed</div>
-                {lastMove ? (
-                  <div className="font-mono text-xs text-slate-300">
-                    <span className="text-cyan-400 font-bold">x={lastMove.from}</span> (f={lastMove.fromCost}) ➜{' '}
-                    <span className="text-amber-400 font-bold">x'={lastMove.candidate}</span> (f={lastMove.candCost})
-                    <div className="mt-0.5">
-                      <span className={lastMove.delta <= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
-                        Energy Δ = {lastMove.delta > 0 ? `+${lastMove.delta}` : lastMove.delta}
-                      </span>{' '}
-                      <span className="text-slate-500 text-[11px]">
-                        ({lastMove.delta <= 0 ? 'Downhill improvement' : 'Uphill worsening'})
+                      <span className="text-[11px] text-slate-400 truncate max-w-[200px]" title={lastMove.reason}>
+                        {lastMove.reason}
                       </span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-slate-500 font-mono text-xs">Ready. Click 'Cool & Run' or 'Single Step'.</div>
-                )}
-              </div>
-
-              <div className="border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4">
-                <div className="text-[10px] uppercase font-mono text-slate-500 mb-1">Metropolis Acceptance Formula</div>
-                {lastMove ? (
-                  <div className="font-mono text-xs">
-                    {lastMove.delta <= 0 ? (
-                      <span className="text-emerald-400 font-semibold">P(accept) = 1.00 (100% Guaranteed)</span>
-                    ) : (
-                      <div>
-                        <span className="text-slate-300">
-                          P = exp(-{lastMove.delta} / {lastMove.temp.toFixed(2)}) ={' '}
-                          <strong className="text-amber-300">{lastMove.prob.toFixed(4)}</strong>
-                        </span>
-                        <div className="text-[11px] text-slate-400">
-                          Random roll <strong className="text-white">{lastMove.roll.toFixed(4)}</strong> vs P:
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-slate-500 font-mono text-xs">P(accept) = exp(-Δ / T) for worsening Δ &gt; 0</div>
-                )}
-              </div>
-
-              <div className="border-t md:border-t-0 md:border-l border-slate-800 pt-2 md:pt-0 md:pl-4 flex flex-col justify-center">
-                <div className="text-[10px] uppercase font-mono text-slate-500 mb-1">Outcome</div>
-                {lastMove ? (
-                  <div className="flex items-center gap-2">
-                    {lastMove.accepted ? (
-                      <span className="badge badge-emerald flex items-center gap-1 text-xs">
-                        <CheckCircle2 size={13} />
-                        ACCEPTED
-                      </span>
-                    ) : (
-                      <span className="badge badge-rose flex items-center gap-1 text-xs">
-                        <XCircle size={13} />
-                        REJECTED
-                      </span>
-                    )}
-                    <span className="text-[11px] text-slate-400 truncate max-w-[200px]" title={lastMove.reason}>
-                      {lastMove.reason}
-                    </span>
-                  </div>
-                ) : (
-                  <span className="text-slate-500 text-xs font-mono">No moves evaluated yet</span>
-                )}
+                  ) : (
+                    <span className="text-slate-500 text-xs font-mono">No moves evaluated yet</span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            /* TSP Annealing Visualizer */
+            <div className="p-5 bg-slate-950 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex justify-between items-center text-xs text-slate-400">
+                <span className="font-mono font-bold text-white uppercase">
+                  TSP Permutation Tour Under Metropolis Cooling (Distance: {tspDistance})
+                </span>
+                <span className="text-cyan-400 font-mono">
+                  At High T: Random crossings accepted · At Low T: Smooth crystallization
+                </span>
+              </div>
+
+              <div className="w-full h-64 bg-slate-900/40 rounded-xl border border-slate-800 relative overflow-hidden">
+                <svg className="w-full h-full" viewBox="0 0 460 260">
+                  <polyline
+                    points={[...tspTour, tspTour[0]]
+                      .map((idx) => `${tspCities[idx].x},${tspCities[idx].y}`)
+                      .join(' ')}
+                    fill="none"
+                    stroke={temperature > 5 ? '#f59e0b' : '#06b6d4'}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+
+                  {tspCities.map((city, idx) => (
+                    <g key={idx}>
+                      <circle cx={city.x} cy={city.y} r={12} fill="#0f172a" stroke="#06b6d4" strokeWidth="2" />
+                      <text x={city.x} y={city.y + 4} textAnchor="middle" className="text-xs font-mono font-bold fill-white">
+                        {city.label}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              </div>
+            </div>
+          )}
 
           {/* Real-Time Cost History Timeline Chart */}
           <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span className="font-mono font-bold text-slate-300 uppercase flex items-center gap-1.5">
-                <TrendingDown size={14} className="text-cyan-400" />
-                Optimization Trajectory (Last {history.length} Steps)
+                <Activity size={14} className="text-cyan-400" />
+                Thermodynamic Energy Convergence History (Last {history.length} Steps)
               </span>
               <div className="flex items-center gap-3 text-[10px] font-mono">
                 <span className="flex items-center gap-1">
@@ -836,10 +993,7 @@ export const SimulatedAnnealingLab: React.FC = () => {
               {history.map((pt, i) => {
                 const heightPct = Math.max(8, Math.min(100, ((35 - pt.cost) / 32) * 100));
                 return (
-                  <div
-                    key={i}
-                    className="flex-1 flex flex-col items-center justify-end h-full px-0.5 group relative"
-                  >
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end h-full px-0.5 group relative">
                     <div
                       className={`w-full rounded-t-sm transition-all ${
                         pt.type === 'improve'
@@ -850,7 +1004,6 @@ export const SimulatedAnnealingLab: React.FC = () => {
                       }`}
                       style={{ height: `${heightPct}%` }}
                     />
-                    {/* Tooltip */}
                     <div className="hidden group-hover:block absolute -top-8 z-30 bg-slate-950 border border-slate-700 px-1.5 py-0.5 rounded text-[9px] font-mono whitespace-nowrap text-white">
                       Step {pt.step}: Cost {pt.cost} (T={pt.temp.toFixed(1)})
                     </div>
