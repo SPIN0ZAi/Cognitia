@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Crosshair,
-  HelpCircle,
+  RotateCcw
 } from 'lucide-react';
 
 interface Point2D {
@@ -15,62 +15,71 @@ type DistanceMetric = 'euclidean' | 'manhattan' | 'chebyshev';
 
 export const KNNClassifierLab: React.FC = () => {
   // Slide 12 UCLM Exam Points by default
-  const defaultPoints: Point2D[] = [
-    { id: 'A', x: 1.5, y: 2.0, label: 'Red' },
-    { id: 'B', x: 2.2, y: 3.2, label: 'Red' },
-    { id: 'C', x: 3.0, y: 1.8, label: 'Red' },
-    { id: 'D', x: 3.8, y: 3.0, label: 'Red' },
-    { id: 'E', x: 2.8, y: 4.5, label: 'Red' },
-    { id: 'F', x: 6.0, y: 5.5, label: 'Blue' },
-    { id: 'G', x: 7.2, y: 4.8, label: 'Blue' },
-    { id: 'H', x: 8.0, y: 6.2, label: 'Blue' },
-    { id: 'I', x: 6.8, y: 7.0, label: 'Blue' },
-    { id: 'J', x: 5.5, y: 3.8, label: 'Blue' },
-  ];
+  const defaultPoints: Point2D[] = useMemo(
+    () => [
+      { id: 'A', x: 1.5, y: 2.0, label: 'Red' },
+      { id: 'B', x: 2.2, y: 3.2, label: 'Red' },
+      { id: 'C', x: 3.0, y: 1.8, label: 'Red' },
+      { id: 'D', x: 3.8, y: 3.0, label: 'Red' },
+      { id: 'E', x: 2.8, y: 4.5, label: 'Red' },
+      { id: 'F', x: 6.0, y: 5.5, label: 'Blue' },
+      { id: 'G', x: 7.2, y: 4.8, label: 'Blue' },
+      { id: 'H', x: 8.0, y: 6.2, label: 'Blue' },
+      { id: 'I', x: 6.8, y: 7.0, label: 'Blue' },
+      { id: 'J', x: 5.5, y: 3.8, label: 'Blue' }
+    ],
+    []
+  );
 
   const [points, setPoints] = useState<Point2D[]>(defaultPoints);
   const [queryPoint, setQueryPoint] = useState<{ x: number; y: number }>({ x: 4.5, y: 4.0 });
   const [k, setK] = useState<number>(3);
   const [metric, setMetric] = useState<DistanceMetric>('euclidean');
   const [weightedVoting, setWeightedVoting] = useState<boolean>(false);
-  const [newPointClass, setNewPointClass] = useState<'Red' | 'Blue'>('Red');
-  const [showHeatmap, setShowHeatmap] = useState<boolean>(true);
+  const [normalizeScale] = useState<boolean>(false);
 
-  // Compute distance function
-  const calcDist = (x1: number, y1: number, x2: number, y2: number): number => {
-    if (metric === 'manhattan') {
-      return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+  // Compute distance according to selected metric
+  const calcDist = useCallback(
+    (x1: number, y1: number, x2: number, y2: number): number => {
+      // If scale distortion is simulated: x range 0-10 vs y range 0-800
+      const sy1 = normalizeScale ? y1 : y1;
+      const sy2 = normalizeScale ? y2 : y2;
+
+      if (metric === 'manhattan') {
+        return Math.abs(x1 - x2) + Math.abs(sy1 - sy2);
+      }
+      if (metric === 'chebyshev') {
+        return Math.max(Math.abs(x1 - x2), Math.abs(sy1 - sy2));
+      }
+      return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(sy1 - sy2, 2));
+    },
+    [metric, normalizeScale]
+  );
+
+  // Predict class and identify k nearest neighbors
+  const { queryResult, neighbors, boundaryRadius } = useMemo(() => {
+    if (points.length === 0) {
+      return {
+        queryResult: { label: 'Tie' as const, redScore: 0, blueScore: 0 },
+        neighbors: [],
+        boundaryRadius: 0
+      };
     }
-    if (metric === 'chebyshev') {
-      return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2));
-    }
-    return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
-  };
 
-  // Predict class for any arbitrary coordinate (x, y)
-  const classifyPoint = (
-    qx: number,
-    qy: number,
-    ptList: Point2D[],
-    kVal: number,
-    isWeighted: boolean
-  ): { label: 'Red' | 'Blue' | 'Tie'; redScore: number; blueScore: number; radius: number } => {
-    if (ptList.length === 0) return { label: 'Tie', redScore: 0, blueScore: 0, radius: 0 };
-
-    const withDist = ptList.map((pt) => ({
+    const withDist = points.map((pt) => ({
       ...pt,
-      dist: Math.max(0.001, calcDist(qx, qy, pt.x, pt.y)),
+      dist: Math.max(0.001, calcDist(queryPoint.x, queryPoint.y, pt.x, pt.y))
     }));
     withDist.sort((a, b) => a.dist - b.dist);
 
-    const neighbors = withDist.slice(0, Math.min(kVal, withDist.length));
-    const radius = neighbors[neighbors.length - 1].dist;
+    const kNeighbors = withDist.slice(0, Math.min(k, withDist.length));
+    const maxRadius = kNeighbors[kNeighbors.length - 1].dist;
 
     let redScore = 0;
     let blueScore = 0;
 
-    neighbors.forEach((n) => {
-      const weight = isWeighted ? 1.0 / (n.dist * n.dist) : 1.0;
+    kNeighbors.forEach((n) => {
+      const weight = weightedVoting ? 1.0 / Math.pow(n.dist, 2) : 1.0;
       if (n.label === 'Red') redScore += weight;
       else blueScore += weight;
     });
@@ -79,121 +88,34 @@ export const KNNClassifierLab: React.FC = () => {
     if (redScore > blueScore) label = 'Red';
     else if (blueScore > redScore) label = 'Blue';
 
-    return { label, redScore, blueScore, radius };
-  };
+    return {
+      queryResult: {
+        label,
+        redScore: parseFloat(redScore.toFixed(2)),
+        blueScore: parseFloat(blueScore.toFixed(2))
+      },
+      neighbors: kNeighbors,
+      boundaryRadius: maxRadius
+    };
+  }, [points, queryPoint, k, calcDist, weightedVoting]);
 
-  // Query prediction
-  const queryResult = useMemo(() => {
-    return classifyPoint(queryPoint.x, queryPoint.y, points, k, weightedVoting);
-  }, [queryPoint, points, k, metric, weightedVoting]);
-
-  // Neighbors for the query point
-  const queryNeighbors = useMemo(() => {
-    const withDist = points.map((pt) => ({
-      ...pt,
-      dist: calcDist(queryPoint.x, queryPoint.y, pt.x, pt.y),
-    }));
-    withDist.sort((a, b) => a.dist - b.dist);
-    return withDist.slice(0, Math.min(k, withDist.length));
-  }, [queryPoint, points, k, metric]);
-
-  // Generate 2D Decision Boundary Background Mesh
-  const heatmapMesh = useMemo(() => {
-    if (!showHeatmap || points.length === 0) return [];
-    const cols = 28;
-    const rows = 20;
-    const cells: { x: number; y: number; label: string }[] = [];
-
-    for (let c = 0; c < cols; c++) {
-      for (let r = 0; r < rows; r++) {
-        const x = (c / (cols - 1)) * 10;
-        const y = (r / (rows - 1)) * 8;
-        const res = classifyPoint(x, y, points, k, weightedVoting);
-        cells.push({ x, y, label: res.label });
-      }
-    }
-    return cells;
-  }, [points, k, metric, weightedVoting, showHeatmap]);
-
-  // SVG dimensions
-  const svgW = 540;
-  const svgH = 260;
-  const margin = { top: 20, right: 30, bottom: 35, left: 40 };
-  const plotW = svgW - margin.left - margin.right;
-  const plotH = svgH - margin.top - margin.bottom;
-
-  const toPx = (x: number) => margin.left + (x / 10) * plotW;
-  const toPy = (y: number) => margin.top + plotH - (y / 8) * plotH;
-
-  const toCoordX = (px: number) => Math.max(0, Math.min(10, ((px - margin.left) / plotW) * 10));
-  const toCoordY = (py: number) => Math.max(0, Math.min(8, ((margin.top + plotH - py) / plotH) * 8));
-
-  // Canvas click to move query point or add sample
+  // Click canvas to move query crosshair or add point
   const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    if (
-      clickX >= margin.left &&
-      clickX <= margin.left + plotW &&
-      clickY >= margin.top &&
-      clickY <= margin.top + plotH
-    ) {
-      const cx = parseFloat(toCoordX(clickX).toFixed(2));
-      const cy = parseFloat(toCoordY(clickY).toFixed(2));
+    const domainX = Math.max(0.2, Math.min(9.8, (clickX / rect.width) * 10.0));
+    const domainY = Math.max(0.2, Math.min(7.8, (1 - clickY / rect.height) * 8.0));
 
-      if (e.shiftKey) {
-        // Add new sample point
-        setPoints((prev) => [
-          ...prev,
-          {
-            id: `p-${Date.now()}`,
-            x: cx,
-            y: cy,
-            label: newPointClass,
-          },
-        ]);
-      } else {
-        // Move query point
-        setQueryPoint({ x: cx, y: cy });
-      }
-    }
+    setQueryPoint({
+      x: parseFloat(domainX.toFixed(2)),
+      y: parseFloat(domainY.toFixed(2))
+    });
   };
 
-  // Preset loaders
-  const loadPreset = (presetName: string) => {
-    if (presetName === 'exam') {
-      setPoints(defaultPoints);
-      setQueryPoint({ x: 4.5, y: 4.0 });
-      setK(3);
-    } else if (presetName === 'concentric') {
-      // Concentric circles (where linear models fail, but k-NN succeeds!)
-      const pts: Point2D[] = [];
-      // Inner circle Red
-      for (let i = 0; i < 14; i++) {
-        const a = (i / 14) * 2 * Math.PI;
-        pts.push({ id: `c1-${i}`, x: 5 + Math.cos(a) * 1.5, y: 4 + Math.sin(a) * 1.2, label: 'Red' });
-      }
-      // Outer ring Blue
-      for (let i = 0; i < 22; i++) {
-        const a = (i / 22) * 2 * Math.PI;
-        pts.push({ id: `c2-${i}`, x: 5 + Math.cos(a) * 3.4, y: 4 + Math.sin(a) * 2.8, label: 'Blue' });
-      }
-      setPoints(pts);
-      setQueryPoint({ x: 5, y: 4 });
-      setK(3);
-    } else if (presetName === 'outlier') {
-      // Linearly separable with an intruder outlier
-      const pts: Point2D[] = [
-        ...defaultPoints,
-        { id: 'intruder', x: 2.5, y: 2.5, label: 'Blue' }, // Blue deep in Red territory!
-      ];
-      setPoints(pts);
-      setQueryPoint({ x: 2.8, y: 2.7 });
-      setK(1);
-    }
-  };
+  const toPx = (x: number) => (x / 10.0) * 600;
+  const toPy = (y: number) => 300 - (y / 8.0) * 300;
 
   return (
     <div className="visualizer-container">
@@ -202,287 +124,337 @@ export const KNNClassifierLab: React.FC = () => {
         <div className="visualizer-title-area">
           <div className="visualizer-title">
             <Crosshair size={20} style={{ color: 'var(--lab-accent-cyan)' }} />
-            k-Nearest Neighbors (k-NN) Visual Classifier Laboratory (Lesson 10, Slides 1–28)
+            k-Nearest Neighbors (k-NN) Classification Radar & Metric Contours
           </div>
           <div className="visualizer-subtitle">
-            2D Decision Boundary Heatmap, Minkowski Distance Metrics & Distance-Weighted Voting Dynamics
+            Euclidean ($L_2$), Manhattan ($L_1$), Chebyshev ($L_\infty$) & Distance-Weighted Voting (UCLM Slides 8–24)
           </div>
         </div>
 
         <div className="visualizer-controls">
-          <button onClick={() => loadPreset('exam')} className="btn-tactile btn-sm">
-            <span>UCLM Exam Preset</span>
-          </button>
-          <button onClick={() => loadPreset('concentric')} className="btn-tactile btn-sm btn-primary">
-            <span>Concentric Circles</span>
-          </button>
-          <button onClick={() => loadPreset('outlier')} className="btn-tactile btn-sm btn-amber">
-            <span>Noisy Outlier Test</span>
-          </button>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <button
+              onClick={() => {
+                setPoints(defaultPoints);
+                setQueryPoint({ x: 4.5, y: 4.0 });
+                setK(3);
+                setMetric('euclidean');
+                setWeightedVoting(false);
+              }}
+              className="btn-tactile btn-sm"
+            >
+              <RotateCcw size={14} />
+              <span>Reset Exam Points</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="visualizer-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {/* Hyperparameter Bar */}
+        {/* Controls Deck */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
             gap: '1rem',
+            padding: '1rem',
             background: 'var(--lab-bg-surface)',
-            padding: '1rem 1.25rem',
             borderRadius: 'var(--radius-md)',
-            border: '1px solid var(--border-subtle)',
+            border: '1px solid var(--lab-border-subtle)'
           }}
         >
-          {/* k parameter */}
+          {/* Hyperparameter k Slider */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Neighborhood Size (k):</span>
-              <strong className="font-mono text-cyan-400" style={{ fontSize: '0.9rem' }}>
-                k = {k} {k % 2 === 0 ? '(Even: Tie possible)' : '(Odd: Tie breaker)'}
-              </strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', marginBottom: '0.35rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Number of Neighbors $k$:</span>
+              <strong className="font-mono text-cyan-400">k = {k}</strong>
             </div>
             <input
               type="range"
               min="1"
-              max="15"
-              step="1"
+              max="9"
+              step="2" // Odd numbers prevent binary ties
               value={k}
               onChange={(e) => setK(parseInt(e.target.value, 10))}
               style={{ width: '100%', accentColor: 'var(--lab-accent-cyan)' }}
             />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-              <span>k=1 (Sharp/Overfitting)</span>
-              <span>k=7 (Smooth)</span>
-              <span>k=15 (Global majority)</span>
-            </div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
+              Odd values (1, 3, 5, 7) prevent tie votes in binary classification.
+            </span>
           </div>
 
-          {/* Metric selector */}
+          {/* Metric Selector */}
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-              Distance Metric:
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Distance Metric (UCLM Slide 14):
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               {(
                 [
-                  { id: 'euclidean', label: 'Euclidean (L2)' },
-                  { id: 'manhattan', label: 'Manhattan (L1)' },
-                  { id: 'chebyshev', label: 'Chebyshev (L∞)' },
+                  { id: 'euclidean', label: 'Euclidean L₂' },
+                  { id: 'manhattan', label: 'Manhattan L₁' },
+                  { id: 'chebyshev', label: 'Chebyshev L∞' }
                 ] as const
               ).map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setMetric(m.id)}
                   className={`btn-tactile btn-xs ${metric === m.id ? 'btn-primary' : ''}`}
-                  style={{ flex: 1, padding: '0.35rem 0.2rem' }}
+                  style={{ flex: 1 }}
                 >
-                  {m.label.split(' ')[0]}
+                  {m.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Options: Weighted voting & Heatmap */}
+          {/* Voting Weighting Rule */}
           <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
-              Advanced Modes:
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <label style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={weightedVoting}
-                  onChange={(e) => setWeightedVoting(e.target.checked)}
-                />
-                <span>Distance-Weighted Vote (w = 1/d²)</span>
-              </label>
-              <label style={{ fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={showHeatmap}
-                  onChange={(e) => setShowHeatmap(e.target.checked)}
-                />
-                <span>Show Decision Boundary Heatmap</span>
-              </label>
-            </div>
-          </div>
-
-          {/* New Point Color Mode */}
-          <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-              Shift+Click Adds Point:
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Voting Scheme (Slide 22):
             </div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
-                onClick={() => setNewPointClass('Red')}
-                className={`btn-tactile btn-xs ${newPointClass === 'Red' ? 'btn-amber' : ''}`}
+                onClick={() => setWeightedVoting(false)}
+                className={`btn-tactile btn-xs ${!weightedVoting ? 'btn-amber' : ''}`}
                 style={{ flex: 1 }}
               >
-                🔴 Class Red
+                Majority Vote
               </button>
               <button
-                onClick={() => setNewPointClass('Blue')}
-                className={`btn-tactile btn-xs ${newPointClass === 'Blue' ? 'btn-primary' : ''}`}
+                onClick={() => setWeightedVoting(true)}
+                className={`btn-tactile btn-xs ${weightedVoting ? 'btn-lime' : ''}`}
                 style={{ flex: 1 }}
               >
-                🔵 Class Blue
+                Distance-Weighted ($1/d^2$)
               </button>
+            </div>
+            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
+              {weightedVoting
+                ? 'Closer neighbors have quadratically stronger votes.'
+                : 'Each neighbor casts 1 equal vote.'}
+            </span>
+          </div>
+
+          {/* Query Coordinates Inputs */}
+          <div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.35rem', fontWeight: 600 }}>
+              Query Probe $(q_x, q_y)$:
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <input
+                type="number"
+                min="0"
+                max="10"
+                step="0.1"
+                value={queryPoint.x}
+                onChange={(e) => setQueryPoint((p) => ({ ...p, x: parseFloat(e.target.value) || 0 }))}
+                className="font-mono text-xs"
+                style={{ width: '50%', padding: '0.3rem', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-medium)', borderRadius: '4px', color: '#fff' }}
+              />
+              <input
+                type="number"
+                min="0"
+                max="8"
+                step="0.1"
+                value={queryPoint.y}
+                onChange={(e) => setQueryPoint((p) => ({ ...p, y: parseFloat(e.target.value) || 0 }))}
+                className="font-mono text-xs"
+                style={{ width: '50%', padding: '0.3rem', background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-medium)', borderRadius: '4px', color: '#fff' }}
+              />
             </div>
           </div>
         </div>
 
-        {/* 2D Decision Boundary Canvas */}
+        {/* Prediction Telemetry Card */}
+        <div
+          style={{
+            padding: '1rem',
+            background:
+              queryResult.label === 'Red'
+                ? 'rgba(251, 113, 133, 0.08)'
+                : queryResult.label === 'Blue'
+                ? 'rgba(56, 189, 248, 0.08)'
+                : 'rgba(255, 255, 255, 0.05)',
+            border: `1px solid ${
+              queryResult.label === 'Red'
+                ? '#fb7185'
+                : queryResult.label === 'Blue'
+                ? 'var(--lab-accent-cyan)'
+                : 'var(--border-subtle)'
+            }`,
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '0.75rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Classified Label:</span>
+            <span
+              className="font-mono"
+              style={{
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                color: queryResult.label === 'Red' ? '#fb7185' : 'var(--lab-accent-cyan)'
+              }}
+            >
+              CLASS {queryResult.label.toUpperCase()}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+            <span>
+              Red Votes: <strong style={{ color: '#fb7185' }}>{queryResult.redScore}</strong>
+            </span>
+            <span>
+              Blue Votes: <strong style={{ color: 'var(--lab-accent-cyan)' }}>{queryResult.blueScore}</strong>
+            </span>
+            <span>
+              Neighborhood Radius: <strong>{boundaryRadius.toFixed(2)}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* SVG Scatter & Neighborhood Radar */}
         <div
           style={{
             background: 'var(--lab-bg-obsidian)',
             borderRadius: 'var(--radius-md)',
             border: '1px solid var(--lab-border-active)',
             padding: '1rem',
-            position: 'relative',
+            position: 'relative'
           }}
         >
-          {/* Top Status Readout */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Query Point Q({queryPoint.x}, {queryPoint.y}):</span>
-              <span
-                className="badge font-mono"
-                style={{
-                  background:
-                    queryResult.label === 'Red'
-                      ? 'rgba(239, 68, 68, 0.25)'
-                      : queryResult.label === 'Blue'
-                      ? 'rgba(56, 189, 248, 0.25)'
-                      : 'rgba(255, 255, 255, 0.1)',
-                  color:
-                    queryResult.label === 'Red'
-                      ? '#f87171'
-                      : queryResult.label === 'Blue'
-                      ? '#38bdf8'
-                      : '#cbd5e1',
-                  border: `1px solid ${queryResult.label === 'Red' ? '#ef4444' : queryResult.label === 'Blue' ? '#38bdf8' : '#94a3b8'}`,
-                }}
-              >
-                PREDICTED: {queryResult.label.toUpperCase()}
-              </span>
-            </div>
-
-            {/* Voting tally */}
-            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.75rem' }}>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Red Votes: </span>
-                <strong className="font-mono text-rose-400">
-                  {weightedVoting ? queryResult.redScore.toFixed(2) : queryResult.redScore}
-                </strong>
-              </div>
-              <div>
-                <span style={{ color: 'var(--text-muted)' }}>Blue Votes: </span>
-                <strong className="font-mono text-cyan-400">
-                  {weightedVoting ? queryResult.blueScore.toFixed(2) : queryResult.blueScore}
-                </strong>
-              </div>
-            </div>
-          </div>
-
-          {/* SVG Canvas */}
-          <div style={{ width: '100%', height: '260px' }}>
+          <div style={{ width: '100%', height: '300px' }}>
             <svg
-              viewBox={`0 0 ${svgW} ${svgH}`}
+              viewBox="0 0 600 300"
+              style={{ width: '100%', height: '100%', cursor: 'crosshair' }}
               onClick={handleCanvasClick}
-              style={{ width: '100%', height: '100%', cursor: 'crosshair', userSelect: 'none' }}
             >
-              {/* Heatmap Mesh */}
-              {showHeatmap &&
-                heatmapMesh.map((cell, idx) => {
-                  const px = toPx(cell.x);
-                  const py = toPy(cell.y);
-                  const fillColor =
-                    cell.label === 'Red'
-                      ? 'rgba(239, 68, 68, 0.12)'
-                      : cell.label === 'Blue'
-                      ? 'rgba(56, 189, 248, 0.12)'
-                      : 'transparent';
+              {/* Grid Lines */}
+              {Array.from({ length: 11 }).map((_, i) => (
+                <line
+                  key={`gx-${i}`}
+                  x1={(i / 10) * 600}
+                  y1="0"
+                  x2={(i / 10) * 600}
+                  y2="300"
+                  stroke="rgba(255,255,255,0.04)"
+                />
+              ))}
+              {Array.from({ length: 9 }).map((_, i) => (
+                <line
+                  key={`gy-${i}`}
+                  x1="0"
+                  y1={(i / 8) * 300}
+                  x2="600"
+                  y2={(i / 8) * 300}
+                  stroke="rgba(255,255,255,0.04)"
+                />
+              ))}
 
+              {/* Metric Boundary Contour Shape centered at queryPoint */}
+              {(() => {
+                const qx = toPx(queryPoint.x);
+                const qy = toPy(queryPoint.y);
+                const rx = (boundaryRadius / 10.0) * 600;
+                const ry = (boundaryRadius / 8.0) * 300;
+
+                if (metric === 'euclidean') {
+                  // Circle / Ellipse in pixel coordinates
                   return (
-                    <circle
-                      key={`hm-${idx}`}
-                      cx={px}
-                      cy={py}
-                      r="9"
-                      fill={fillColor}
-                      stroke="none"
+                    <ellipse
+                      cx={qx}
+                      cy={qy}
+                      rx={rx}
+                      ry={ry}
+                      fill="rgba(56, 189, 248, 0.08)"
+                      stroke="var(--lab-accent-cyan)"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
                     />
                   );
-                })}
+                } else if (metric === 'manhattan') {
+                  // Diamond (Rhombus)
+                  const dPath = `M ${qx} ${qy - ry} L ${qx + rx} ${qy} L ${qx} ${qy + ry} L ${qx - rx} ${qy} Z`;
+                  return (
+                    <path
+                      d={dPath}
+                      fill="rgba(251, 191, 36, 0.08)"
+                      stroke="var(--lab-accent-amber)"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                    />
+                  );
+                } else {
+                  // Chebyshev: Square / Box
+                  return (
+                    <rect
+                      x={qx - rx}
+                      y={qy - ry}
+                      width={rx * 2}
+                      height={ry * 2}
+                      fill="rgba(198, 242, 119, 0.08)"
+                      stroke="var(--lab-accent-lime)"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                    />
+                  );
+                }
+              })()}
 
-              {/* Grid Lines */}
-              {[0, 2, 4, 6, 8, 10].map((xVal) => {
-                const px = toPx(xVal);
-                return (
-                  <g key={`x-${xVal}`}>
-                    <line x1={px} y1={margin.top} x2={px} y2={margin.top + plotH} stroke="rgba(255, 255, 255, 0.05)" />
-                    <text x={px} y={margin.top + plotH + 15} fill="var(--text-muted)" fontSize="9" textAnchor="middle" fontFamily="monospace">
-                      {xVal}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {[0, 2, 4, 6, 8].map((yVal) => {
-                const py = toPy(yVal);
-                return (
-                  <g key={`y-${yVal}`}>
-                    <line x1={margin.left} y1={py} x2={margin.left + plotW} y2={py} stroke="rgba(255, 255, 255, 0.05)" />
-                    <text x={margin.left - 8} y={py + 3} fill="var(--text-muted)" fontSize="9" textAnchor="end" fontFamily="monospace">
-                      {yVal}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* Distance radius circle around Query Point */}
-              {queryResult.radius > 0 && metric === 'euclidean' && (
-                <circle
-                  cx={toPx(queryPoint.x)}
-                  cy={toPy(queryPoint.y)}
-                  r={(queryResult.radius / 10) * plotW}
-                  fill="none"
-                  stroke="var(--lab-accent-cyan)"
+              {/* Tethers connecting query point to its k nearest neighbors */}
+              {neighbors.map((n) => (
+                <line
+                  key={`tether-${n.id}`}
+                  x1={toPx(queryPoint.x)}
+                  y1={toPy(queryPoint.y)}
+                  x2={toPx(n.x)}
+                  y2={toPy(n.y)}
+                  stroke={n.label === 'Red' ? '#fb7185' : 'var(--lab-accent-cyan)'}
                   strokeWidth="1.5"
-                  strokeDasharray="4 3"
+                  strokeDasharray="2 2"
+                  opacity="0.8"
                 />
-              )}
+              ))}
 
               {/* Training Points */}
               {points.map((pt) => {
-                const cx = toPx(pt.x);
-                const cy = toPy(pt.y);
-                const isNeighbor = queryNeighbors.some((n) => n.id === pt.id);
+                const px = toPx(pt.x);
+                const py = toPy(pt.y);
+                const isNeighbor = neighbors.some((n) => n.id === pt.id);
 
                 return (
                   <g key={pt.id}>
                     {isNeighbor && (
-                      <circle cx={cx} cy={cy} r="11" fill="none" stroke="var(--lab-accent-lime)" strokeWidth="2" />
+                      <circle
+                        cx={px}
+                        cy={py}
+                        r="11"
+                        fill="none"
+                        stroke="#ffffff"
+                        strokeWidth="1.5"
+                      />
                     )}
                     <circle
-                      cx={cx}
-                      cy={cy}
+                      cx={px}
+                      cy={py}
                       r="6.5"
-                      fill={pt.label === 'Red' ? '#ef4444' : '#38bdf8'}
-                      stroke="#000"
+                      fill={pt.label === 'Red' ? '#fb7185' : 'var(--lab-accent-cyan)'}
+                      stroke="#ffffff"
                       strokeWidth="1.5"
                     />
                     <text
-                      x={cx}
-                      y={cy + 3}
-                      fill="#fff"
-                      fontSize="8"
-                      fontWeight="bold"
+                      x={px}
+                      y={py - 10}
+                      fill="var(--text-muted)"
+                      fontSize="9"
                       textAnchor="middle"
                       fontFamily="monospace"
-                      pointerEvents="none"
+                      fontWeight="bold"
                     >
                       {pt.id}
                     </text>
@@ -490,78 +462,62 @@ export const KNNClassifierLab: React.FC = () => {
                 );
               })}
 
-              {/* Query Point Q */}
+              {/* Query Probe Crosshair */}
               <g transform={`translate(${toPx(queryPoint.x)}, ${toPy(queryPoint.y)})`}>
-                <polygon
-                  points="0,-10 9,6 -9,6"
-                  fill="var(--lab-accent-lime)"
-                  stroke="#000"
-                  strokeWidth="1.5"
-                />
-                <text x="0" y="2" fill="#000" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="monospace">
-                  Q
+                <circle r="9" fill="none" stroke="#ffffff" strokeWidth="2" />
+                <circle r="3.5" fill="#ffffff" />
+                <line x1="-14" y1="0" x2="14" y2="0" stroke="#ffffff" strokeWidth="1.5" />
+                <line x1="0" y1="-14" x2="0" y2="14" stroke="#ffffff" strokeWidth="1.5" />
+                <text x="12" y="-12" fill="#ffffff" fontSize="10" fontFamily="monospace" fontWeight="bold">
+                  Query q
                 </text>
               </g>
             </svg>
           </div>
 
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.35rem', textAlign: 'center' }}>
-            Click anywhere to move Query Point Q (lime triangle). Hold <strong>Shift + Click</strong> to add a new training point.
+          <div style={{ marginTop: '0.5rem', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+            Click anywhere on the radar canvas to relocate the query probe crosshair!
           </div>
         </div>
 
-        {/* Neighbors Table & Educational Insight */}
-        <div className="grid-2">
-          {/* Nearest Neighbors Roster */}
-          <div className="card" style={{ padding: '1rem' }}>
-            <div style={{ fontSize: '0.78rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-              k = {k} Nearest Neighbors to Q
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {queryNeighbors.map((n, rank) => (
-                <div
-                  key={n.id}
-                  style={{
-                    padding: '0.35rem 0.6rem',
-                    borderRadius: '4px',
-                    background: 'var(--lab-bg-surface)',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    fontSize: '0.72rem',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>#{rank + 1}</span>
-                    <strong style={{ color: n.label === 'Red' ? '#f87171' : '#38bdf8' }}>Point {n.id}</strong>
-                    <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>({n.x}, {n.y})</span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--text-muted)' }}>Dist: </span>
-                    <strong className="font-mono text-cyan-400">{n.dist.toFixed(2)}</strong>
-                    {weightedVoting && (
-                      <span style={{ marginLeft: '0.5rem', color: 'var(--lab-accent-lime)' }}>
-                        w={((1.0 / Math.pow(Math.max(0.01, n.dist), 2))).toFixed(1)}
-                      </span>
-                    )}
-                  </div>
-                </div>
+        {/* Neighbors Ranking Table */}
+        <div className="card" style={{ padding: '1rem', background: 'var(--lab-bg-surface)' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--lab-accent-cyan)', marginBottom: '0.5rem' }}>
+            Ranked Nearest Neighbors List for Query $q({queryPoint.x}, {queryPoint.y})$
+          </div>
+          <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                <th style={{ textAlign: 'left', padding: '0.35rem' }}>Rank</th>
+                <th style={{ textAlign: 'left', padding: '0.35rem' }}>Point</th>
+                <th style={{ textAlign: 'left', padding: '0.35rem' }}>Class</th>
+                <th style={{ textAlign: 'right', padding: '0.35rem' }}>Distance $d(q, x_i)$</th>
+                <th style={{ textAlign: 'right', padding: '0.35rem' }}>Voting Weight</th>
+              </tr>
+            </thead>
+            <tbody>
+              {neighbors.map((n, idx) => (
+                <tr key={n.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                  <td style={{ padding: '0.35rem', fontFamily: 'monospace' }}>#{idx + 1}</td>
+                  <td style={{ padding: '0.35rem', fontFamily: 'monospace' }}>Point {n.id} ({n.x}, {n.y})</td>
+                  <td style={{ padding: '0.35rem' }}>
+                    <span
+                      className={`badge ${n.label === 'Red' ? 'badge-rose' : 'badge-cyan'} font-mono`}
+                      style={{ fontSize: '0.65rem' }}
+                    >
+                      {n.label}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: 'right', padding: '0.35rem', fontFamily: 'monospace' }}>
+                    {n.dist.toFixed(3)}
+                  </td>
+                  <td style={{ textAlign: 'right', padding: '0.35rem', fontFamily: 'monospace' }}>
+                    {weightedVoting ? (1.0 / Math.pow(n.dist, 2)).toFixed(2) : '1.0'}
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
-
-          {/* Educational Insight Card */}
-          <div className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--lab-accent-cyan)', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.4rem' }}>
-              <HelpCircle size={15} />
-              <span>k-NN Decision Boundary Dynamics</span>
-            </div>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-              Notice how <strong>k = 1</strong> creates small isolated boundary islands (overfitting to individual noisy samples).
-              As you increase <strong>k to 5 or 9</strong>, the separating boundary smooths out into a continuous partition, filtering out local anomalies.
-            </p>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

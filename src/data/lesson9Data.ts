@@ -39,17 +39,23 @@ export const LESSON_9_DATA: LessonData = {
           title: 'Classical Programming vs. Machine Learning',
           slideRef: { lessonId: 'lesson-9', slideNumber: '1–8' },
           summary: 'Inverting the software engineering paradigm from manual rules to data-driven induction.',
-          content: `### The Fundamental Inversion
+          content: `### The Machine Learning Paradigm Shift (Slides 1–8)
 
-In **Classical Programming**, a human engineer manually crafts explicit deterministic rules and writes algorithms:
+In **Classical Programming**, a human engineer manually crafts explicit deterministic rules and algorithms:
 $$\\text{Input Data} + \\text{Handcrafted Rules} \\longrightarrow \\text{Answers / Decisions}$$
 
 In **Machine Learning**, the computer automatically induces the rules and mapping functions from empirical observations:
-$$\\text{Input Data} + \\text{Desired Answers / Feedback} \\longrightarrow \\text{Learned Model (Rules)}$$
+$$\\text{Input Data} + \\text{Ground Truth Labels / Feedback} \\longrightarrow \\text{Learned Model (Rules)}$$
 
-#### Why Machine Learning?
-- Complex real-world perceptual tasks (e.g., computer vision, speech recognition, natural language translation) cannot be specified through manual \`if-else\` rules.
-- Algorithms adapt autonomously to changing data distributions without requiring manual recoding.`,
+#### Direct Comparison: Classical Software vs. Machine Learning
+
+| Dimension | Classical Software Engineering | Inductive Machine Learning |
+| :--- | :--- | :--- |
+| **Logic Source** | Human programmer writes \`if-else\` rules | Inductive algorithm learns weights from training data |
+| **Problem Type** | Deterministic business logic, compilers, sorting | Perceptual tasks (vision, audio, NLP), recommendation |
+| **Adaptability** | Rigid; requires manual code change for new cases | Dynamic; updates automatically when retrained on new data |
+| **Debugging** | Trace stack, inspect logical conditions | Inspect loss curves, confusion matrices, data distributions |
+| **Evaluation** | Unit testing, formal verification ($100\\%$ pass) | Generalization testing on unseen test partitions |`,
           keyTakeaways: [
             'Classical programming requires writing explicit rules; ML induces rules from data.',
             'ML models learn a mapping function f: X → Y by optimizing empirical parameters.',
@@ -60,13 +66,16 @@ $$\\text{Input Data} + \\text{Desired Answers / Feedback} \\longrightarrow \\tex
           title: 'The Three Main Machine Learning Paradigms',
           slideRef: { lessonId: 'lesson-9', slideNumber: '9–18' },
           summary: 'Supervised, Unsupervised, and Reinforcement Learning taxonomy.',
-          content: `### Taxonomy of Machine Learning Paradigms
+          content: `### Taxonomy of Machine Learning Paradigms (Slides 9–18)
 
-| Paradigm | Training Signal | Target Goal | Canonical Examples |
-| :--- | :--- | :--- | :--- |
-| **Supervised Learning** | Labeled dataset $\\mathcal{D} = \\{(x_i, y_i)\\}_{i=1}^N$ | Learn mapping $f(x) \\approx y$ | Classification (Spam detection, tumor diagnosis), Regression (house price prediction) |
-| **Unsupervised Learning** | Unlabeled dataset $\\mathcal{D} = \\{x_i\\}_{i=1}^N$ | Discover latent structure, clusters, or density $p(x)$ | $k$-Means clustering, Principal Component Analysis (PCA), Anomaly detection |
-| **Reinforcement Learning** | Scalar reward feedback $r_t$ from environment | Learn policy $\\pi(a \\mid s)$ maximizing cumulative return $G_t$ | Game playing (AlphaGo, Atari), robot locomotion, autonomous driving |`,
+| Paradigm | Training Signal $\\mathcal{D}$ | Optimization Objective | Feedback Latency | Canonical Algorithms |
+| :--- | :--- | :--- | :--- | :--- |
+| **Supervised Learning** | Labeled pairs $\\{(x_i, y_i)\\}_{i=1}^N$ with ground truth $y_i$ | Minimize prediction loss: $\\min_w \\frac{1}{N}\\sum L(f(x_i; w), y_i)$ | Instantaneous per example | $k$-NN, Decision Trees, Logistic Regression, Linear Regression, SVM |
+| **Unsupervised Learning** | Unlabeled feature vectors $\\{x_i\\}_{i=1}^N$ | Discover latent clusters, density, or low-dimensional manifolds | No external feedback; intrinsic geometry | $k$-Means, Hierarchical Clustering, PCA, Autoencoders |
+| **Reinforcement Learning** | Dynamic state-action-reward tuples $(s_t, a_t, r_t, s_{t+1})$ | Maximize expected cumulative return: $\\max_\\pi \\mathbb{E}[\\sum \\gamma^t r_t]$ | Delayed evaluative rewards | Q-Learning, SARSA, Policy Gradients, Actor-Critic |
+
+> 🎯 **Hands-on Clustering & Taxonomy Exploration**:
+> Explore the 2D $k$-Means clustering laboratory below: spawn 2D data points, trigger centroid migrations $\\mu_k = \\frac{1}{\\|C_k\\|} \\sum_{x \\in C_k} x$, inspect Voronoi decision boundaries, and test your classification knowledge against past UCLM exam questions!`,
           keyTakeaways: [
             'Supervised learning relies on explicit ground-truth labels (y).',
             'Unsupervised learning discovers intrinsic patterns without external guidance.',
@@ -88,22 +97,28 @@ $$\\text{Input Data} + \\text{Desired Answers / Feedback} \\longrightarrow \\tex
           title: 'Generalization, Overfitting & The Bias-Variance Tradeoff',
           slideRef: { lessonId: 'lesson-9', slideNumber: '19–34' },
           summary: 'Why achieving zero training error often leads to disastrous real-world performance.',
-          content: `### Generalization: The True Goal of Machine Learning
+          content: `### Generalization, Overfitting & The Bias-Variance Tradeoff (Slides 19–34)
 
 A machine learning model must perform well on **unseen test data**, not merely memorize its training examples.
 
-#### The Three Model Regimes
-1. **Underfitting (High Bias)**:
-   - The model is too simple to capture the underlying data patterns (e.g., fitting a linear line to quadratic data).
-   - Characterized by: **High Training Error** and **High Test Error**.
-2. **Optimal Generalization (Balanced Tradeoff)**:
-   - The model captures the underlying systemic relationship while ignoring idiosyncratic noise.
-   - Characterized by: **Low Training Error** and **Low Test Error**.
-3. **Overfitting (High Variance)**:
-   - The model is excessively complex (e.g., 10th-degree polynomial), fitting spurious noise and measurement outliers.
-   - Characterized by: **Near-Zero Training Error**, but **Severe Surging Test Error**!
+#### Mathematical Decomposition of Generalization Error:
+For a true data generator $y = f(x) + \\epsilon$ with irreducible observation noise $\\mathbb{E}[\\epsilon] = 0, \\text{Var}(\\epsilon) = \\sigma^2$, the expected mean squared test error of an estimator $\\hat{f}(x)$ decomposes into three distinct components:
+$$\\mathbb{E}\\left[(y - \\hat{f}(x))^2\\right] = \\underbrace{\\left(f(x) - \\mathbb{E}[\\hat{f}(x)]\\right)^2}_{\\text{Bias}[\\hat{f}(x)]^2} + \\underbrace{\\mathbb{E}\\left[(\\hat{f}(x) - \\mathbb{E}[\\hat{f}(x)])^2\\right]}_{\\text{Variance}[\\hat{f}(x)]} + \\underbrace{\\sigma^2}_{\\text{Irreducible Noise}}$$
 
-$$\\text{Expected Error} = \\text{Bias}^2 + \\text{Variance} + \\text{Irreducible Noise } \\sigma^2$$`,
+#### The Three Model Regimes:
+
+| Regime | Model Complexity | Bias vs. Variance | Training Error | Test / Validation Error | Typical Remedy |
+| :--- | :--- | :--- | :---: | :---: | :--- |
+| **Underfitting** | Low (e.g., degree $d=1$) | High Bias, Low Variance | **High** | **High** | Increase capacity, add polynomial features |
+| **Optimal Generalization** | Balanced (e.g., degree $d=3$) | Minimal Total Error | **Low** | **Low** | Deploy model, maintain regularization |
+| **Overfitting** | High (e.g., degree $d=9$) | Low Bias, Surging Variance | **Near 0** | **Surges Heavily** | Add L2 regularization ($\\lambda$), gather more data, prune features |
+
+> 🛡️ **Combating High Variance via L2 Ridge Regularization**:
+> When a model overfits, its weights grow excessively large to oscillate through every noise outlier. L2 Regularization adds a penalty proportional to the squared magnitude of coefficients to the loss function:
+> $$J(w) = \\frac{1}{N}\\sum_{i=1}^N (y_i - \\hat{y}_i)^2 + \\lambda \\sum_{j=1}^M w_j^2$$
+> Increasing the regularization hyperparameter $\\lambda$ shrinks large weights, smoothing the function and pulling the model back from high variance into generalization!
+
+*Explore the polynomial curve fitting playground below: adjust degree d from 1 to 9, dial in Ridge regularization λ, drop custom points, and observe the live train vs test MSE telemetry!*`,
           keyTakeaways: [
             'Training error measures memorization; test error measures generalization.',
             'Overfitting occurs when a complex model memorizes noise instead of systemic patterns.',
@@ -115,17 +130,30 @@ $$\\text{Expected Error} = \\text{Bias}^2 + \\text{Variance} + \\text{Irreducibl
           title: 'Data Partitioning: Train, Validation, and Test Sets',
           slideRef: { lessonId: 'lesson-9', slideNumber: '35–54' },
           summary: 'Avoiding data leakage and conducting honest performance evaluation.',
-          content: `### The Golden Rule of Evaluation
+          content: `### Data Partitioning: The Golden Rule of Evaluation (Slides 35–54)
 
-Never evaluate a machine learning model on the data it was trained on!
+Never evaluate a machine learning model on the data it was trained on! If you train and test on the same observations, a table lookup algorithm that memorizes all rows achieves $100\\%$ accuracy while having zero real-world intelligence.
 
-#### The Three-Way Partition
-- **Training Set (60–70%)**: Used by the optimization algorithm to adjust model parameters (e.g., weights $w$).
-- **Validation Set (15–20%)**: Used by the engineer to compare different algorithms and tune hyperparameters (e.g., polynomial degree $d$, regularization $\\lambda$, $k$ in $k$-NN).
-- **Test Set (15–20%)**: Kept in a vault and accessed **only once** at the very end to provide an unbiased estimate of real-world generalization performance.
+#### The Three-Way Partition:
 
-#### $k$-Fold Cross-Validation
-When data is scarce, split the training data into $k$ equal folds. Train on $k-1$ folds and validate on the remaining fold, repeating $k$ times and averaging the validation scores.`,
+| Partition | Typical Fraction | Primary Purpose | Allowed Operations | Strict Prohibitions |
+| :--- | :---: | :--- | :--- | :--- |
+| **Training Set** | $60\\text{--}70\\%$ | Fit internal model parameters (weights $w$, decision tree splits) | Gradient descent, loss minimization | Evaluating final generalization performance |
+| **Validation Set** | $15\\text{--}20\\%$ | Model selection & hyperparameter tuning | Select polynomial degree $d$, tune $k$ in $k$-NN, choose $\\lambda$ | Fitting model weights directly |
+| **Test Set** | $15\\text{--}20\\%$ | Unbiased final generalization estimate | **Accessed exactly once** at the very end of research | Any form of model retraining or hyperparameter tuning |
+
+> ⚠️ **Data Leakage (The Cardinal Sin)**:
+> Data leakage occurs when information from outside the training dataset is used to create or tune the model. Common pitfalls: normalizing or scaling features using the mean and standard deviation of the entire dataset rather than computing them strictly on the training partition!
+
+#### $k$-Fold Cross-Validation (Slide 44):
+When sample size $N$ is limited, a single validation split may be noisy. In $k$-fold cross-validation:
+1. Divide dataset randomly into $k$ equal-sized folds.
+2. For each fold $i \\in \\{1, \\dots, k\\}$:
+   - Train the model on the remaining $k-1$ folds.
+   - Evaluate performance on fold $i$.
+3. Compute the mean cross-validation score across all $k$ iterations:
+   $$\\text{CV}_k = \\frac{1}{k}\\sum_{i=1}^k \\text{Score}_i$$
+This ensures every single data point is used for validation exactly once without data leakage.`,
           keyTakeaways: [
             'Training set fits parameters; validation set tunes hyperparameters.',
             'Test set must never be touched during model development to prevent data leakage.',

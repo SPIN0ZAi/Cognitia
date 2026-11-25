@@ -3,9 +3,10 @@ import {
   Network,
   RotateCcw,
   SkipForward,
-  Play,
   CheckCircle2,
-  XCircle,
+  HelpCircle,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 
 interface ClusterPoint {
@@ -23,59 +24,87 @@ interface Centroid {
 }
 
 const CENTROID_COLORS = [
-  'var(--lab-accent-cyan)',
-  'var(--lab-accent-lime)',
-  'var(--lab-accent-amber)',
-  '#c084fc', // purple
-  '#f87171', // rose
+  '#38bdf8', // Cyan
+  '#c6f277', // Lime
+  '#fbbf24', // Amber
+  '#a78bfa', // Violet
+  '#fb7185'  // Rose
 ];
 
 interface QuizTask {
   id: number;
-  title: string;
-  description: string;
+  scenario: string;
   correctParadigm: 'supervised' | 'unsupervised' | 'rl';
-  explanation: string;
+  reason: string;
 }
 
-export const MLParadigmsExplorer: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'kmeans' | 'taxonomy'>('kmeans');
+const QUIZ_TASKS: QuizTask[] = [
+  {
+    id: 1,
+    scenario: 'Diagnosing whether a chest X-ray shows pneumonia based on 10,000 radiologist-labeled historical scans.',
+    correctParadigm: 'supervised',
+    reason: 'Each training instance has a target label (Pneumonia: Yes/No) provided by experts. This is Supervised Classification.'
+  },
+  {
+    id: 2,
+    scenario: 'Customer segmentation for a Spanish supermarket: grouping shoppers into behavioral tiers without pre-assigned customer types.',
+    correctParadigm: 'unsupervised',
+    reason: 'No predefined target labels exist. The algorithm discovers natural clusters based on purchase history similarity. This is Unsupervised Clustering.'
+  },
+  {
+    id: 3,
+    scenario: 'Training an autonomous drone to hover stably in windy conditions through trial, error, and stabilization penalties.',
+    correctParadigm: 'rl',
+    reason: 'The agent learns a policy through environmental interactions, state feedback, and scalar reward/penalty signals without direct input-output pairs. This is Reinforcement Learning.'
+  },
+  {
+    id: 4,
+    scenario: 'Predicting the sale price of a house in Albacete given square meters, number of bedrooms, and location coordinates.',
+    correctParadigm: 'supervised',
+    reason: 'The target variable (price in Euros) is a continuous ground-truth value. This is Supervised Regression.'
+  }
+];
 
-  // K-Means State
+export const MLParadigmsExplorer: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'kmeans' | 'taxonomy' | 'quiz'>('kmeans');
+
+  // ==========================================
+  // K-MEANS CLUSTERING SIMULATOR
+  // ==========================================
   const [kCount, setKCount] = useState<number>(3);
-  const [kStep, setKStep] = useState<number>(0);
+  const [stepNum, setStepNum] = useState<number>(0);
   const [isConverged, setIsConverged] = useState<boolean>(false);
 
-  // Generate initial clustered points
+  // Generate initial clustered 2D points
   const initialPoints: ClusterPoint[] = useMemo(() => {
     const pts: ClusterPoint[] = [];
     let id = 1;
 
     // Cluster 1 around (2.5, 2.5)
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       pts.push({
         id: id++,
         x: 2.5 + (Math.random() - 0.5) * 1.8,
         y: 2.5 + (Math.random() - 0.5) * 1.8,
-        cluster: 0,
+        cluster: 0
       });
     }
     // Cluster 2 around (7.0, 3.0)
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       pts.push({
         id: id++,
         x: 7.0 + (Math.random() - 0.5) * 1.8,
         y: 3.0 + (Math.random() - 0.5) * 1.8,
-        cluster: 0,
+        cluster: 0
       });
     }
-    // Cluster 3 around (5.0, 7.5)
-    for (let i = 0; i < 10; i++) {
+    // Cluster 3 around (5.0, 7.2)
+    for (let i = 0; i < 12; i++) {
       pts.push({
         id: id++,
         x: 5.0 + (Math.random() - 0.5) * 2.0,
-        y: 7.5 + (Math.random() - 0.5) * 1.8,
-        cluster: 0,
+        y: 7.2 + (Math.random() - 0.5) * 1.8,
+        cluster: 0
       });
     }
     return pts;
@@ -83,183 +112,98 @@ export const MLParadigmsExplorer: React.FC = () => {
 
   const [points, setPoints] = useState<ClusterPoint[]>(initialPoints);
 
-  // Initialize centroids spread across canvas
-  const initialCentroids: Centroid[] = useMemo(() => {
-    return [
-      { k: 0, x: 2.0, y: 7.0, color: CENTROID_COLORS[0] },
-      { k: 1, x: 5.0, y: 2.0, color: CENTROID_COLORS[1] },
-      { k: 2, x: 8.0, y: 7.0, color: CENTROID_COLORS[2] },
-      { k: 3, x: 5.0, y: 5.0, color: CENTROID_COLORS[3] },
-      { k: 4, x: 1.5, y: 1.5, color: CENTROID_COLORS[4] },
-    ].slice(0, kCount);
-  }, [kCount]);
+  // Initial random centroid positions
+  const getInitialCentroids = (k: number): Centroid[] => {
+    return Array.from({ length: k }, (_, idx) => ({
+      k: idx,
+      x: 1.5 + Math.random() * 7.0,
+      y: 1.5 + Math.random() * 7.0,
+      color: CENTROID_COLORS[idx % CENTROID_COLORS.length]
+    }));
+  };
 
-  const [centroids, setCentroids] = useState<Centroid[]>(initialCentroids);
+  const [centroids, setCentroids] = useState<Centroid[]>(() => getInitialCentroids(3));
 
-  // Compute Inertia / Distortion: sum of squared distances to assigned centroid
-  const inertia = useMemo(() => {
-    return parseFloat(
-      points
-        .reduce((sum, pt) => {
-          const c = centroids[pt.cluster];
-          if (!c) return sum;
-          const distSq = Math.pow(pt.x - c.x, 2) + Math.pow(pt.y - c.y, 2);
-          return sum + distSq;
-        }, 0)
-        .toFixed(2)
-    );
-  }, [points, centroids]);
+  // Reset K-Means
+  const resetKMeans = (k: number) => {
+    setKCount(k);
+    setCentroids(getInitialCentroids(k));
+    setStepNum(0);
+    setIsConverged(false);
+  };
 
-  // Execute 1 step of Lloyd's K-Means Algorithm
+  // Perform single K-Means iteration:
+  // Step A: Assignment Phase (Assign each point to nearest centroid)
+  // Step B: Update Phase (Move centroid to center of mass of its cluster)
   const stepKMeans = () => {
     if (isConverged) return;
 
-    // Step 1: Assignment Step (Assign each point to closest centroid)
-    const newPoints = points.map((pt) => {
+    // 1. Assign points to nearest centroid
+    let hasChanged = false;
+    const updatedPoints = points.map((p) => {
       let minDist = Infinity;
-      let closestK = 0;
+      let nearestCluster = p.cluster;
+
       centroids.forEach((c) => {
-        const d = Math.sqrt(Math.pow(pt.x - c.x, 2) + Math.pow(pt.y - c.y, 2));
-        if (d < minDist) {
-          minDist = d;
-          closestK = c.k;
+        const dist = Math.pow(p.x - c.x, 2) + Math.pow(p.y - c.y, 2);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestCluster = c.k;
         }
       });
-      return { ...pt, cluster: closestK };
+
+      if (nearestCluster !== p.cluster) {
+        hasChanged = true;
+      }
+      return { ...p, cluster: nearestCluster };
     });
 
-    // Step 2: Update Step (Move centroids to mean of assigned points)
+    // 2. Recompute centroid positions
     let maxCentroidShift = 0;
-    const newCentroids = centroids.map((c) => {
-      const assigned = newPoints.filter((p) => p.cluster === c.k);
-      if (assigned.length === 0) return c; // Avoid division by zero
+    const updatedCentroids = centroids.map((c) => {
+      const assigned = updatedPoints.filter((p) => p.cluster === c.k);
+      if (assigned.length === 0) return c;
 
-      const meanX = assigned.reduce((acc, p) => acc + p.x, 0) / assigned.length;
-      const meanY = assigned.reduce((acc, p) => acc + p.y, 0) / assigned.length;
+      const sumX = assigned.reduce((acc, p) => acc + p.x, 0);
+      const sumY = assigned.reduce((acc, p) => acc + p.y, 0);
+      const newX = sumX / assigned.length;
+      const newY = sumY / assigned.length;
 
-      const shift = Math.sqrt(Math.pow(c.x - meanX, 2) + Math.pow(c.y - meanY, 2));
+      const shift = Math.sqrt(Math.pow(newX - c.x, 2) + Math.pow(newY - c.y, 2));
       if (shift > maxCentroidShift) maxCentroidShift = shift;
 
-      return { ...c, x: parseFloat(meanX.toFixed(2)), y: parseFloat(meanY.toFixed(2)) };
+      return { ...c, x: newX, y: newY };
     });
 
-    setPoints(newPoints);
-    setCentroids(newCentroids);
-    setKStep((prev) => prev + 1);
+    setPoints(updatedPoints);
+    setCentroids(updatedCentroids);
+    setStepNum((s) => s + 1);
 
-    if (maxCentroidShift < 0.01) {
+    if (!hasChanged && maxCentroidShift < 0.01) {
       setIsConverged(true);
     }
   };
 
-  const runToConvergence = () => {
-    let currentPts = [...points];
-    let currentCentroids = [...centroids];
+  // ==========================================
+  // QUIZ STATE
+  // ==========================================
+  const [currentQuizIdx, setCurrentQuizIdx] = useState<number>(0);
+  const [selectedParadigm, setSelectedParadigm] = useState<'supervised' | 'unsupervised' | 'rl' | null>(null);
+  const [quizScore, setQuizScore] = useState<number>(0);
 
-    for (let iter = 0; iter < 20; iter++) {
-      // Assignment
-      currentPts = currentPts.map((pt) => {
-        let minDist = Infinity;
-        let closestK = 0;
-        currentCentroids.forEach((c) => {
-          const d = Math.sqrt(Math.pow(pt.x - c.x, 2) + Math.pow(pt.y - c.y, 2));
-          if (d < minDist) {
-            minDist = d;
-            closestK = c.k;
-          }
-        });
-        return { ...pt, cluster: closestK };
-      });
+  const activeQuiz = QUIZ_TASKS[currentQuizIdx];
 
-      // Update
-      let maxShift = 0;
-      currentCentroids = currentCentroids.map((c) => {
-        const assigned = currentPts.filter((p) => p.cluster === c.k);
-        if (assigned.length === 0) return c;
-        const meanX = assigned.reduce((acc, p) => acc + p.x, 0) / assigned.length;
-        const meanY = assigned.reduce((acc, p) => acc + p.y, 0) / assigned.length;
-        const shift = Math.sqrt(Math.pow(c.x - meanX, 2) + Math.pow(c.y - meanY, 2));
-        if (shift > maxShift) maxShift = shift;
-        return { ...c, x: parseFloat(meanX.toFixed(2)), y: parseFloat(meanY.toFixed(2)) };
-      });
-
-      if (maxShift < 0.01) break;
-    }
-
-    setPoints(currentPts);
-    setCentroids(currentCentroids);
-    setKStep((prev) => prev + 5);
-    setIsConverged(true);
-  };
-
-  const resetKMeans = () => {
-    setPoints(initialPoints);
-    setCentroids(initialCentroids);
-    setKStep(0);
-    setIsConverged(false);
-  };
-
-  // Add custom point on canvas click
-  const handleCanvasClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    // ViewBox is 0 0 500 240, margin: left 40, right 460, top 20, bottom 220
-    const coordX = parseFloat((((clickX - 40) / 420) * 10).toFixed(2));
-    const coordY = parseFloat(((1 - (clickY - 20) / 200) * 10).toFixed(2));
-
-    if (coordX >= 0 && coordX <= 10 && coordY >= 0 && coordY <= 10) {
-      setPoints((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          x: coordX,
-          y: coordY,
-          cluster: 0,
-        },
-      ]);
-      setIsConverged(false);
+  const handleAnswerQuiz = (choice: 'supervised' | 'unsupervised' | 'rl') => {
+    setSelectedParadigm(choice);
+    if (choice === activeQuiz.correctParadigm) {
+      setQuizScore((s) => s + 1);
     }
   };
 
-  // Taxonomy Quiz Tasks
-  const quizTasks: QuizTask[] = [
-    {
-      id: 1,
-      title: 'Email Spam Filter',
-      description: 'Given 50,000 emails labeled by human users as "Spam" or "Ham", predict whether new incoming emails are spam.',
-      correctParadigm: 'supervised',
-      explanation: 'Supervised Learning: Each training instance is explicitly paired with a target label y in {Spam, Ham}.',
-    },
-    {
-      id: 2,
-      title: 'Customer Segmentation',
-      description: 'Group 100,000 supermarket shoppers into 5 behavioral clusters based on purchasing history, without any predefined categories.',
-      correctParadigm: 'unsupervised',
-      explanation: 'Unsupervised Learning (Clustering): No target labels exist; discovers latent groupings based on feature similarity.',
-    },
-    {
-      id: 3,
-      title: 'Autonomous Drone Navigation',
-      description: 'A drone learns to navigate dense mountain winds by receiving positive rewards (+10) for forward velocity and large penalties (-100) for collisions.',
-      correctParadigm: 'rl',
-      explanation: 'Reinforcement Learning: An active agent acts sequentially in an environment and learns an optimal policy through scalar reward feedback.',
-    },
-    {
-      id: 4,
-      title: 'House Price Estimation',
-      description: 'Predict the continuous market price of a residential house given square meters, number of bedrooms, and neighborhood crime rate.',
-      correctParadigm: 'supervised',
-      explanation: 'Supervised Learning (Regression): Continuous numerical target labels (selling price in euros) are provided.',
-    },
-  ];
-
-  const [activeQuizIdx, setActiveQuizIdx] = useState<number>(0);
-  const [selectedAnswers, setSelectedAnswers] = useState<{ [id: number]: 'supervised' | 'unsupervised' | 'rl' }>({});
-
-  const currentTask = quizTasks[activeQuizIdx];
-  const userAns = selectedAnswers[currentTask.id];
+  const nextQuiz = () => {
+    setSelectedParadigm(null);
+    setCurrentQuizIdx((idx) => (idx + 1) % QUIZ_TASKS.length);
+  };
 
   return (
     <div className="visualizer-container">
@@ -268,153 +212,154 @@ export const MLParadigmsExplorer: React.FC = () => {
         <div className="visualizer-title-area">
           <div className="visualizer-title">
             <Network size={20} style={{ color: 'var(--lab-accent-cyan)' }} />
-            Machine Learning Paradigms & Unsupervised Clustering Lab (Lesson 9)
+            Machine Learning Paradigms & Unsupervised K-Means Clustering
           </div>
           <div className="visualizer-subtitle">
-            Supervised vs Unsupervised vs Reinforcement Learning & Lloyd's K-Means Clustering Algorithm
+            Supervised, Unsupervised & Reinforcement Learning Taxonomy + Expectation-Maximization Dynamics (UCLM Slides 1–18)
           </div>
         </div>
 
         <div className="visualizer-controls">
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: '0.4rem' }}>
             <button
               onClick={() => setActiveTab('kmeans')}
               className={`btn-tactile btn-sm ${activeTab === 'kmeans' ? 'btn-primary' : ''}`}
             >
-              <span>K-Means Lab (Unsupervised)</span>
+              <Sparkles size={14} />
+              <span>K-Means Simulator</span>
             </button>
             <button
               onClick={() => setActiveTab('taxonomy')}
-              className={`btn-tactile btn-sm ${activeTab === 'taxonomy' ? 'btn-primary' : ''}`}
+              className={`btn-tactile btn-sm ${activeTab === 'taxonomy' ? 'btn-amber' : ''}`}
             >
-              <span>Paradigm Taxonomy</span>
+              <Layers size={14} />
+              <span>The 3 Paradigms</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('quiz')}
+              className={`btn-tactile btn-sm ${activeTab === 'quiz' ? 'btn-lime' : ''}`}
+            >
+              <HelpCircle size={14} />
+              <span>Exam Quiz</span>
             </button>
           </div>
         </div>
       </div>
 
       <div className="visualizer-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {activeTab === 'kmeans' ? (
-          <>
-            {/* Control Strip */}
+        {/* ========================================================================= */}
+        {/* TAB 1: K-MEANS CLUSTERING SIMULATOR */}
+        {/* ========================================================================= */}
+        {activeTab === 'kmeans' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Control Bar */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
+                padding: '0.85rem 1rem',
                 background: 'var(--lab-bg-surface)',
-                padding: '0.75rem 1rem',
                 borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-subtle)',
+                border: '1px solid var(--lab-border-subtle)',
                 flexWrap: 'wrap',
-                gap: '0.75rem',
+                gap: '0.75rem'
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Clusters (K):</span>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  Number of Clusters $K$:
+                </span>
                 <div style={{ display: 'flex', gap: '4px' }}>
-                  {[2, 3, 4, 5].map((k) => (
+                  {[2, 3, 4, 5].map((kVal) => (
                     <button
-                      key={k}
-                      onClick={() => {
-                        setKCount(k);
-                        setCentroids(
-                          [
-                            { k: 0, x: 2.0, y: 7.0, color: CENTROID_COLORS[0] },
-                            { k: 1, x: 5.0, y: 2.0, color: CENTROID_COLORS[1] },
-                            { k: 2, x: 8.0, y: 7.0, color: CENTROID_COLORS[2] },
-                            { k: 3, x: 5.0, y: 5.0, color: CENTROID_COLORS[3] },
-                            { k: 4, x: 1.5, y: 1.5, color: CENTROID_COLORS[4] },
-                          ].slice(0, k)
-                        );
-                        setKStep(0);
-                        setIsConverged(false);
-                      }}
-                      className={`btn-tactile btn-xs ${kCount === k ? 'btn-primary' : ''}`}
+                      key={kVal}
+                      onClick={() => resetKMeans(kVal)}
+                      className={`btn-tactile btn-xs ${kCount === kVal ? 'btn-cyan' : ''}`}
                     >
-                      K = {k}
+                      K = {kVal}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                <button onClick={stepKMeans} disabled={isConverged} className="btn-tactile btn-sm btn-emerald">
-                  <SkipForward size={14} />
-                  <span>Step Algorithm</span>
-                </button>
-                <button onClick={runToConvergence} disabled={isConverged} className="btn-tactile btn-sm">
-                  <Play size={14} />
-                  <span>To Convergence</span>
-                </button>
-                <button onClick={resetKMeans} className="btn-tactile btn-sm">
-                  <RotateCcw size={14} />
-                  <span>Reset</span>
-                </button>
-              </div>
-
-              {/* Distortion Telemetry */}
-              <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Iteration: </span>
-                  <strong className="font-mono text-cyan-400">{kStep}</strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Distortion J: </span>
-                  <strong className="font-mono text-lime-400">{inertia}</strong>
-                </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span className="badge badge-amber font-mono">
+                  Iteration: {stepNum}
+                </span>
                 {isConverged && (
-                  <span className="badge badge-lime font-mono">CONVERGED</span>
+                  <span className="badge badge-lime font-mono">
+                    <CheckCircle2 size={12} style={{ display: 'inline', marginRight: '3px' }} />
+                    CONVERGED
+                  </span>
                 )}
+                <button
+                  onClick={stepKMeans}
+                  disabled={isConverged}
+                  className="btn-tactile btn-sm btn-emerald"
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <SkipForward size={14} />
+                  <span>Iterate (Assign & Center)</span>
+                </button>
+                <button onClick={() => resetKMeans(kCount)} className="btn-tactile btn-sm">
+                  <RotateCcw size={14} />
+                </button>
               </div>
             </div>
 
-            {/* 2D K-Means SVG Scatter Plot */}
+            {/* SVG 2D Scatter Canvas */}
             <div
               style={{
                 background: 'var(--lab-bg-obsidian)',
                 borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--lab-border-active)',
-                padding: '1rem',
-                position: 'relative',
+                padding: '1rem'
               }}
             >
-              <div style={{ width: '100%', height: '240px' }}>
-                <svg
-                  viewBox="0 0 500 240"
-                  onClick={handleCanvasClick}
-                  style={{ width: '100%', height: '100%', cursor: 'crosshair', userSelect: 'none' }}
-                >
+              <div style={{ width: '100%', height: '280px' }}>
+                <svg viewBox="0 0 600 280" style={{ width: '100%', height: '100%', userSelect: 'none' }}>
                   {/* Grid Lines */}
-                  {[0, 2, 4, 6, 8, 10].map((v) => {
-                    const py = 20 + ((10 - v) / 10) * 200;
-                    const px = 40 + (v / 10) * 420;
-                    return (
-                      <g key={v}>
-                        <line x1="40" y1={py} x2="460" y2={py} stroke="rgba(255,255,255,0.06)" />
-                        <line x1={px} y1="20" x2={px} y2="220" stroke="rgba(255,255,255,0.06)" />
-                      </g>
-                    );
-                  })}
+                  {Array.from({ length: 9 }).map((_, i) => (
+                    <line
+                      key={`gx-${i}`}
+                      x1={40 + i * 65}
+                      y1="20"
+                      x2={40 + i * 65}
+                      y2="260"
+                      stroke="rgba(255,255,255,0.04)"
+                    />
+                  ))}
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <line
+                      key={`gy-${i}`}
+                      x1="40"
+                      y1={20 + i * 60}
+                      x2="560"
+                      y2={20 + i * 60}
+                      stroke="rgba(255,255,255,0.04)"
+                    />
+                  ))}
 
-                  {/* Connect points to their assigned centroid with faint lines */}
+                  {/* Connect Points to Assigned Centroids (Tethers) */}
                   {points.map((pt) => {
                     const c = centroids[pt.cluster];
                     if (!c) return null;
-                    const px = 40 + (pt.x / 10) * 420;
-                    const py = 20 + ((10 - pt.y) / 10) * 200;
-                    const cx = 40 + (c.x / 10) * 420;
-                    const cy = 20 + ((10 - c.y) / 10) * 200;
+                    const px = 40 + (pt.x / 10) * 520;
+                    const py = 260 - (pt.y / 10) * 240;
+                    const cx = 40 + (c.x / 10) * 520;
+                    const cy = 260 - (c.y / 10) * 240;
+
                     return (
                       <line
-                        key={`line-${pt.id}`}
+                        key={`tether-${pt.id}`}
                         x1={px}
                         y1={py}
                         x2={cx}
                         y2={cy}
                         stroke={c.color}
                         strokeWidth="0.8"
-                        strokeOpacity="0.35"
+                        opacity="0.25"
                       />
                     );
                   })}
@@ -422,50 +367,43 @@ export const MLParadigmsExplorer: React.FC = () => {
                   {/* Data Points */}
                   {points.map((pt) => {
                     const c = centroids[pt.cluster];
-                    const px = 40 + (pt.x / 10) * 420;
-                    const py = 20 + ((10 - pt.y) / 10) * 200;
+                    const px = 40 + (pt.x / 10) * 520;
+                    const py = 260 - (pt.y / 10) * 240;
+
                     return (
                       <circle
                         key={pt.id}
                         cx={px}
                         cy={py}
-                        r="5"
-                        fill={c ? c.color : '#94a3b8'}
-                        stroke="#000"
-                        strokeWidth="1.5"
+                        r="4.5"
+                        fill={c ? c.color : '#ffffff'}
+                        stroke="#ffffff"
+                        strokeWidth="1"
                       />
                     );
                   })}
 
-                  {/* Centroids */}
+                  {/* Centroids (Distinct Crosshairs) */}
                   {centroids.map((c) => {
-                    const cx = 40 + (c.x / 10) * 420;
-                    const cy = 20 + ((10 - c.y) / 10) * 200;
+                    const cx = 40 + (c.x / 10) * 520;
+                    const cy = 260 - (c.y / 10) * 240;
+
                     return (
-                      <g key={`cent-${c.k}`}>
-                        {/* Outer pulsating ring */}
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r="12"
-                          fill="none"
-                          stroke={c.color}
-                          strokeWidth="2"
-                          strokeDasharray="4 2"
-                        />
-                        {/* Centroid Crosshair */}
-                        <circle cx={cx} cy={cy} r="6" fill={c.color} stroke="#000" strokeWidth="2" />
-                        <line x1={cx - 10} y1={cy} x2={cx + 10} y2={cy} stroke={c.color} strokeWidth="2" />
-                        <line x1={cx} y1={cy - 10} x2={cx} y2={cy + 10} stroke={c.color} strokeWidth="2" />
+                      <g key={`c-${c.k}`}>
+                        <circle cx={cx} cy={cy} r="14" fill="none" stroke={c.color} strokeWidth="2" opacity="0.8" />
+                        <circle cx={cx} cy={cy} r="5" fill={c.color} />
+                        <line x1={cx - 16} y1={cy} x2={cx + 16} y2={cy} stroke={c.color} strokeWidth="1.5" />
+                        <line x1={cx} y1={cy - 16} x2={cx} y2={cy + 16} stroke={c.color} strokeWidth="1.5" />
                         <text
-                          x={cx + 14}
-                          y={cy + 4}
+                          x={cx}
+                          y={cy - 18}
                           fill={c.color}
                           fontSize="10"
+                          textAnchor="middle"
                           fontFamily="monospace"
                           fontWeight="bold"
                         >
-                          μ_{c.k + 1}
+                          μ{c.k + 1}
                         </text>
                       </g>
                     );
@@ -473,85 +411,177 @@ export const MLParadigmsExplorer: React.FC = () => {
                 </svg>
               </div>
 
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
-                Unsupervised Learning discovers latent patterns without ground-truth labels! Click anywhere to add custom points.
-              </div>
-            </div>
-          </>
-        ) : (
-          /* Tab 2: Paradigm Taxonomy & Sorter */
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div>
-                <span className="badge badge-cyan font-mono">PARADIGM TAXONOMY</span>
-                <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
-                  {currentTask.title}
-                </h4>
-              </div>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {quizTasks.map((t, idx) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setActiveQuizIdx(idx)}
-                    className={`btn-tactile btn-xs ${activeQuizIdx === idx ? 'btn-primary' : ''}`}
-                  >
-                    Task {idx + 1}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1.5rem', lineHeight: '1.6' }}>
-              {currentTask.description}
-            </p>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {(
-                [
-                  { id: 'supervised', label: 'Supervised Learning', desc: 'Labeled pairs (x, y)' },
-                  { id: 'unsupervised', label: 'Unsupervised Learning', desc: 'Unlabeled data p(x)' },
-                  { id: 'rl', label: 'Reinforcement Learning', desc: 'Agent & scalar rewards' },
-                ] as const
-              ).map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => setSelectedAnswers((prev) => ({ ...prev, [currentTask.id]: p.id }))}
-                  className={`btn-tactile ${userAns === p.id ? 'btn-primary' : ''}`}
-                  style={{
-                    padding: '0.75rem',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    textAlign: 'left',
-                  }}
-                >
-                  <strong style={{ fontSize: '0.85rem' }}>{p.label}</strong>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{p.desc}</span>
-                </button>
-              ))}
-            </div>
-
-            {userAns && (
               <div
                 style={{
-                  padding: '0.9rem 1.1rem',
-                  borderRadius: 'var(--radius-md)',
-                  background: userAns === currentTask.correctParadigm ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
-                  border: `1px solid ${userAns === currentTask.correctParadigm ? 'var(--accent-emerald)' : 'var(--accent-rose)'}`,
+                  marginTop: '0.5rem',
+                  padding: '0.6rem 0.9rem',
+                  background: 'rgba(0,0,0,0.4)',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-medium)',
+                  fontSize: '0.78rem',
+                  color: '#f8fafc',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  fontSize: '0.82rem',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}
               >
-                {userAns === currentTask.correctParadigm ? (
-                  <CheckCircle2 size={20} color="var(--accent-emerald)" />
-                ) : (
-                  <XCircle size={20} color="var(--accent-rose)" />
-                )}
-                <div>
-                  <strong>{userAns === currentTask.correctParadigm ? 'Correct Paradigm!' : 'Incorrect Paradigm!'}</strong>
-                  <p style={{ marginTop: '0.2rem', color: 'var(--text-secondary)' }}>{currentTask.explanation}</p>
+                <span>
+                  <strong>Unsupervised Clustering:</strong> The algorithm discovers natural clusters without any human supervisor or labels!
+                </span>
+                <span className="font-mono text-cyan-400">
+                  μ_k = (1 / |C_k|) Σ x_i
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 2: THE 3 PARADIGMS TAXONOMY */}
+        {/* ========================================================================= */}
+        {activeTab === 'taxonomy' && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+              gap: '1rem'
+            }}
+          >
+            {/* Supervised Learning */}
+            <div className="card" style={{ padding: '1.25rem', background: 'var(--lab-bg-surface)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span className="badge badge-cyan font-mono">PARADIGM 1</span>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc' }}>
+                  Supervised Learning
+                </h4>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                The training dataset consists of input-output pairs D = &#123;(x₁, y₁), ..., (xₙ, yₙ)&#125;. The goal is to learn a mapping function f: X → Y that accurately predicts target y on novel instances.
+              </p>
+              <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                • <strong>Classification:</strong> Discrete target (e.g. Spam vs Ham, Disease diagnosis).<br />
+                • <strong>Regression:</strong> Continuous target (e.g. House price, temperature).
+              </div>
+            </div>
+
+            {/* Unsupervised Learning */}
+            <div className="card" style={{ padding: '1.25rem', background: 'var(--lab-bg-surface)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span className="badge badge-lime font-mono">PARADIGM 2</span>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc' }}>
+                  Unsupervised Learning
+                </h4>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                The training dataset consists solely of unlabeled inputs D = &#123;x₁, ..., xₙ&#125;. No ground-truth output is provided. The model discovers intrinsic structure, density, or clusters.
+              </p>
+              <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                • <strong>Clustering:</strong> Grouping similar points (e.g. K-Means, DBSCAN).<br />
+                • <strong>Dimensionality Reduction:</strong> Compressing features (e.g. PCA, t-SNE).
+              </div>
+            </div>
+
+            {/* Reinforcement Learning */}
+            <div className="card" style={{ padding: '1.25rem', background: 'var(--lab-bg-surface)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <span className="badge badge-amber font-mono">PARADIGM 3</span>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc' }}>
+                  Reinforcement Learning
+                </h4>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                No fixed dataset. An autonomous agent navigates an environment through actions a_t, transitioning states s_t → s_(t+1) and receiving reward signals r_t. The goal is to maximize cumulative return.
+              </p>
+              <div style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                • <strong>Exploration vs Exploitation:</strong> Discovering high-reward states.<br />
+                • <strong>Temporal Credit Assignment:</strong> Delayed rewards (Q-Learning, SARSA).
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* TAB 3: EXAM SCENARIO QUIZ */}
+        {/* ========================================================================= */}
+        {activeTab === 'quiz' && (
+          <div className="card" style={{ padding: '1.5rem', background: 'var(--lab-bg-surface)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <HelpCircle size={18} className="text-amber-400" />
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#f8fafc' }}>
+                  UCLM Exam Scenario {activeQuiz.id} of {QUIZ_TASKS.length}
+                </h4>
+              </div>
+              <span className="badge badge-cyan font-mono">Score: {quizScore} / {QUIZ_TASKS.length}</span>
+            </div>
+
+            <p style={{ fontSize: '0.9rem', color: '#f8fafc', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+              &ldquo;{activeQuiz.scenario}&rdquo;
+            </p>
+
+            {/* Paradigm Selection Buttons */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+              {(['supervised', 'unsupervised', 'rl'] as const).map((paradigm) => {
+                const label =
+                  paradigm === 'supervised'
+                    ? 'Supervised Learning'
+                    : paradigm === 'unsupervised'
+                    ? 'Unsupervised Learning'
+                    : 'Reinforcement Learning';
+                const isSelected = selectedParadigm === paradigm;
+                const isCorrect = selectedParadigm !== null && activeQuiz.correctParadigm === paradigm;
+
+                return (
+                  <button
+                    key={paradigm}
+                    onClick={() => handleAnswerQuiz(paradigm)}
+                    disabled={selectedParadigm !== null}
+                    className={`btn-tactile btn-sm ${
+                      isSelected
+                        ? isCorrect
+                          ? 'btn-emerald'
+                          : 'btn-rose'
+                        : isCorrect
+                        ? 'btn-emerald'
+                        : ''
+                    }`}
+                    style={{ flex: 1, minWidth: '160px', padding: '0.6rem 0.8rem' }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Explanation & Next */}
+            {selectedParadigm !== null && (
+              <div
+                style={{
+                  marginTop: '1rem',
+                  padding: '0.85rem 1rem',
+                  borderRadius: '6px',
+                  background:
+                    selectedParadigm === activeQuiz.correctParadigm
+                      ? 'rgba(198, 242, 119, 0.08)'
+                      : 'rgba(251, 113, 133, 0.08)',
+                  border: `1px solid ${
+                    selectedParadigm === activeQuiz.correctParadigm ? 'var(--lab-accent-lime)' : '#fb7185'
+                  }`
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: selectedParadigm === activeQuiz.correctParadigm ? 'var(--lab-accent-lime)' : '#fb7185', marginBottom: '0.25rem' }}>
+                  {selectedParadigm === activeQuiz.correctParadigm ? 'Correct!' : 'Incorrect'}
                 </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  {activeQuiz.reason}
+                </div>
+                <button
+                  onClick={nextQuiz}
+                  className="btn-tactile btn-xs btn-primary"
+                  style={{ marginTop: '0.75rem' }}
+                >
+                  Next Scenario →
+                </button>
               </div>
             )}
           </div>

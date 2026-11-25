@@ -137,32 +137,40 @@ $$P(\\text{select } i) = \\frac{f_i}{\\sum_{j=1}^N f_j}$$
           title: 'Recombination (Crossover) and Mutation Operators',
           slideRef: { lessonId: 'lesson-8', slideNumber: '25–38' },
           summary: '1-point, 2-point, and uniform crossover; bit-flip mutation and the necessity of elitism.',
-          content: `### Crossover Operators
+          content: `### Crossover and Recombination Operators (Slides 25–38)
 
-With probability $p_c$ (typically $p_c \\in [0.6, 0.95]$), two selected parents undergo recombination:
-1. **1-Point Crossover**:
-   - Randomly choose a cut index $k \\in \\{1, \\dots, L-1\\}$.
-   - Parent 1: $[A_1 \\dots A_k \\mid A_{k+1} \\dots A_L]$
-   - Parent 2: $[B_1 \\dots B_k \\mid B_{k+1} \\dots B_L]$
-   - Offspring 1: $[A_1 \\dots A_k \\mid B_{k+1} \\dots B_L]$
-   - Offspring 2: $[B_1 \\dots B_k \\mid A_{k+1} \\dots A_L]$
-2. **2-Point Crossover**:
-   - Choose two cut points $k_1 < k_2$. Swap the internal segment between $k_1$ and $k_2$. Reduces positional bias present in 1-point crossover.
-3. **Uniform Crossover**:
-   - For each gene position $j$, flip a fair coin ($p=0.5$). If heads, Offspring 1 takes parent A's gene; if tails, parent B's gene.
+With probability $p_c$ (typically $p_c \\in [0.6, 0.95]$), two selected parents undergo genetic recombination:
 
----
+| Operator | Applicable Representation | Mechanism | Key Property |
+| :--- | :--- | :--- | :--- |
+| **1-Point Crossover** | Binary, Discrete Integer | Single cut point $k$; swap tails | High positional bias (genes at opposite ends separated) |
+| **2-Point Crossover** | Binary, Discrete Integer | Two cut points $k_1 < k_2$; swap middle segment | Reduced positional bias; treats chromosome as a ring |
+| **Uniform Crossover** | Binary, Discrete Integer | Independent 50/50 coin flip per gene position | Zero positional bias; high distributional disruption |
+| **Order Crossover (OX1)** | Permutations (TSP) | Preserves relative order and subset from parents | **Guarantees zero duplicate or missing cities!** |
 
-### Mutation Operator
-With probability $p_m$ per gene (standard recommendation: $p_m = 1/L$), each bit is inverted ($0 \\leftrightarrow 1$).
-- Mutation restores lost genetic diversity, preventing alleles from becoming permanently fixed across the entire population.
+#### The Order Crossover (OX1) Algorithm for TSP (Exam Crucial):
+1. Select two cut points $k_1 < k_2$ at random.
+2. Copy the swath of cities between $k_1$ and $k_2$ from Parent 1 directly into Offspring 1 at the identical indices.
+3. Starting from index $k_2 + 1$ in Parent 2 (wrapping around cyclically to index 0), collect all remaining cities that are **not already present** in the swath.
+4. Insert these cities in order into Offspring 1 starting from index $k_2 + 1$ (wrapping cyclically).
+5. Repeat symmetrically with Parent 2 copied into Offspring 2.
 
 ---
 
-### Elitism (Preserving the Best)
-- In standard generational replacement, stochastic crossover and mutation can accidentally destroy the best solution found so far.
-- **Elitism**: Directly copies the top $e$ individuals ($e \\in \\{1, 2\\}$) unchanged into the next generation.
-- **Theorem**: Elitist Genetic Algorithms guarantee monotonic convergence of the best fitness: $f(x^*)_{t+1} \\ge f(x^*)_t$.`,
+### Mutation Operators across Representations:
+With probability $p_m$ per gene (standard canonical rate: $p_m = 1/L$, where $L$ is chromosome length):
+- **Binary**: **Bit-Flip** ($0 \\leftrightarrow 1$).
+- **Permutation**: **Swap Mutation** (exchange two distinct city indices), **Inversion Mutation** (reverse an internal subsegment), or **Scramble Mutation** (randomly permute an internal subsegment).
+
+---
+
+### Elitism: Preserving Historical Champions
+- In pure generational replacement, stochastic crossover and destructive mutation can accidentally destroy the highest-fitness individual found.
+- **Elitism**: Copies the top $e$ individuals ($e \\in \\{1, 2\\}$) into the next generation without modification.
+- **Convergence Guarantee**: Elitist Genetic Algorithms guarantee that the best-so-far fitness $f(x^*)$ is **monotonically non-decreasing**:
+  $$f(x^*)_{t+1} \\ge f(x^*)_t$$
+
+*Experiment with 1-point, 2-point, uniform, and Order Crossover (OX1) live in the interactive laboratory below!*`,
           keyTakeaways: [
             '1-point and 2-point crossover exchange contiguous blocks of genes.',
             'Mutation rate pm is typically set to 1/L to average one mutation per chromosome.',
