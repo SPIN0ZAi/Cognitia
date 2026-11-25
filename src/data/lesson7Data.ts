@@ -62,25 +62,23 @@ The algorithm performs a local analysis of the search space, evaluating the curr
           title: 'The Neighbourhood Structure N(x) and Operator Sizing',
           slideRef: { lessonId: 'lesson-7', slideNumber: '6–10' },
           summary: 'Formal definition of N(x) and operator sizing for TSP 2-opt, bit-flips, and graph coloring.',
-          content: `### Formal Definition of Neighbourhood (Slide 7)
+          content: `### Formal Definition of Neighbourhood & Operator Sizing (Slides 6–10)
 
 Given a problem representation space $S$ and a **neighbourhood operator** $op$, the neighbourhood of a configuration $x \\in S$, denoted $N(x)$, is:
 $$N(x) = \\{x' \\in S \\mid x' \\text{ can be reached from } x \\text{ by applying } op \\text{ once}\\}$$
 
-#### Sizing Neighborhoods Across Representations (Slide 8–10)
-1. **Binary Strings (0/1 Knapsack, Max-SAT)**:
-   - Configuration: $x = (x_1, \\dots, x_n) \\in \\{0, 1\\}^n$.
-   - Operator: **1-bit flip** (invert variable $x_i$).
-   - Neighbourhood size: $|N(x)| = n$.
-2. **Permutations (Traveling Salesperson Problem)**:
-   - Configuration: $\\pi = (c_1, \\dots, c_n)$.
-   - Operator A: **2-opt / Inversion** (cut edges $(i, i+1)$ and $(j, j+1)$ and reconnect). Size: $|N(x)| = \\frac{n(n-1)}{2}$.
-   - Operator B: **City Swap** (exchange positions of two cities $\\pi_i$ and $\\pi_j$). Size: $|N(x)| = \\frac{n(n-1)}{2}$.
-   - Operator C: **Insertion** (remove city $\\pi_i$ and insert at position $j$). Size: $|N(x)| = n(n-1)$.
-3. **Discrete Integer Vectors (Fixed-$r$ Graph Coloring)**:
-   - Configuration: $c = (c_1, \\dots, c_n)$ where $c_i \\in \\{1, \\dots, r\\}$.
-   - Operator: Change the color of one conflicted vertex to another available color.
-   - Size: $|V_{\\text{conflicts}}| \\times (r - 1) \\le n(r - 1)$.`,
+#### Comprehensive Neighborhood Sizing Reference (Slides 8–10):
+
+| Problem Domain | Representation | Operator | Exact Size $|N(x)|$ | Landscape Characteristic |
+| :--- | :--- | :--- | :---: | :--- |
+| **0/1 Knapsack / Max-SAT** | Binary $x \\in \\{0, 1\\}^n$ | **1-Bit Flip** (invert $x_i$) | $n$ | Hamming hypercube; distance 1 transitions |
+| **TSP (Inversion)** | Permutation $\\pi \\in \\Pi_n$ | **2-opt / Segment Reversal** | $\\frac{n(n-1)}{2}$ | Uncrosses intersecting edges; standard for Euclidean TSP |
+| **TSP (City Swap)** | Permutation $\\pi \\in \\Pi_n$ | **Node Swap** (exchange $\\pi_i, \\pi_j$) | $\\frac{n(n-1)}{2}$ | Exchanges two individual positions; coarser landscape |
+| **TSP (City Insertion)** | Permutation $\\pi \\in \\Pi_n$ | **Insertion** (remove $\\pi_i$ and insert at $j$) | $n(n-1)$ | Asymmetric shifts; double the size of swaps |
+| **Graph Coloring** | Integer $c \\in \\{0, \\dots, r-1\\}^k$ | **Recolor Conflicted Vertex** | $|V_{\\text{conf}}| \\times (r-1) \\le k(r-1)$ | Restricted to conflicting vertices to prune wasteful moves |
+
+> 💡 **Landscape Topology Principle**:
+> The choice of neighborhood operator defines the **topological connectivity** of the configuration space. An operator that makes small modifications creates smooth landscapes with many gentle local peaks, whereas large-jump operators create rugged landscapes with fewer but wider basins.`,
           keyTakeaways: [
             'N(x) defines the landscape topology and the adjacent candidate states.',
             '1-bit flip yields size n; TSP 2-opt yields size n(n-1)/2.',
@@ -136,20 +134,25 @@ For a maximization problem:
           title: 'The Three Main Pathologies: Local Optima, Plateaus, and Ridges',
           slideRef: { lessonId: 'lesson-7', slideNumber: '17–25' },
           summary: 'Detailed mechanics of how greedy 1-step lookahead gets trapped in landscape traps.',
-          content: `### The Three Main Difficulties of Hill Climbing (Slide 17)
+          content: `### The Three Main Pathologies of Hill Climbing (Slides 17–25)
 
-All three pathologies stem from a single root cause: **Hill Climbing only looks one step ahead and strictly refuses worsening moves**.
+All three pathologies stem from a single structural root cause: **Hill Climbing evaluates only immediate 1-step neighbors and strictly forbids worsening moves**.
 
-1. **Local Optimum**:
-   - No neighbor improves the current score: $\\forall x' \\in N(x), f(x') \\le f(x)$, yet a globally superior state exists elsewhere.
-   - The algorithm halts, unable to bridge the intermediate valley.
-2. **Plateau**:
-   - A flat region where all adjacent configurations have identical scores: $\\forall x' \\in N(x), f(x') = f(x)$.
-   - Hill Climbing has no gradient to follow.
-   - **Course Remedy (Slide 17)**: Allow **sideways moves** ($f(x') = f(x)$), but cap consecutive sideways moves (e.g., limit of 100) to prevent infinite loops.
-3. **Ridge**:
-   - A sequence of local peaks where the crest rises diagonally across coordinates.
-   - Moving along any single coordinate drops down into a valley. Since the operator only flips one variable at a time, the algorithm halts or makes agonizingly slow progress.`,
+| Pathology | Landscape Topology | Mathematical Condition | Greedy HC Behavior | Course Remedy (Slide 17, 21) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Local Optimum** | Peak surrounded by lower elevations in all directions | $\\forall x' \\in N(x), f(x') < f(x)$ | Halts permanently; cannot cross intermediate valley | RLS (random restarts), ILS (perturbation), Simulated Annealing |
+| **Plateau / Shoulder** | Flat elevation zone with zero gradient | $\\forall x' \\in N(x), f(x') = f(x)$ | Wanders aimlessly with zero directional guidance | Allow **sideways moves** ($f(x') = f(x)$), but cap at $M \\le 100$ steps |
+| **Diagonal Ridge** | Sequence of peaks rising diagonally across axes | 1-step cardinal moves drop off the crest into valleys | Oscillates back and forth or halts on the spine | Multi-variable moves, diagonal neighborhood operators |
+
+> ⚠️ **UCLM Exam Pitfall: Flat Local Maxima vs. Shoulders (Slide 21)**:
+> Students often assume all flat regions are dead ends. In reality, there are two distinct types:
+> 1. **Shoulders**: A flat section that eventually breaks out onto an ascending slope. Allowing sideways moves successfully crosses shoulders and reaches higher elevations!
+> 2. **Flat Local Maxima**: A plateau that drops off on all sides. Sideways moves on flat local maxima wander aimlessly without improvement. A hard limit (e.g., max 100 consecutive sideways moves) is strictly mandatory to prevent infinite loops.
+
+> 🧗 **The 2D Diagonal Ridge Dilemma (Slide 23–25)**:
+> In functions like $f(x_1, x_2)$ with an ascending diagonal crest, an operator that changes only one variable at a time (e.g., $x_1 \\pm \\delta$ or $x_2 \\pm \\delta$) steps off the ridge and into the valley on every move! The greedy climber declares a false local optimum, even though a joint diagonal move $(x_1 + \\delta, x_2 + \\delta)$ would climb smoothly up the spine.
+
+*Experience these three pathologies first-hand in the interactive laboratory below: sculpt custom terrain, trigger sideways moves on shoulders, and navigate the 2D ridge!*`,
           keyTakeaways: [
             'Local Optima trap the search because worse moves are forbidden.',
             'Plateaus have zero gradient; sideways moves must be capped to prevent infinite loops.',
@@ -204,19 +207,20 @@ Instead of always choosing the best neighbor, Stochastic Hill Climbing introduce
           title: 'Randomized Local Search (RLS) & Iterated Local Search (ILS)',
           slideRef: { lessonId: 'lesson-7', slideNumber: '31–45' },
           summary: 'Restarting from random states (RLS) vs perturbing previous optima (ILS).',
-          content: `### Four Strategies for Escaping Local Optima (Slide 31)
+          content: `### Four Metaheuristic Escape Paradigms (Slides 31–45)
 
-When Hill Climbing terminates at a local optimum, metaheuristics apply four distinct escape paradigms:
-1. **RLS (Randomized Local Search / Random Restarts)**: Restart Hill Climbing from an entirely new uniformly random configuration.
-2. **ILS (Iterated Local Search)**: Perturb the obtained local optimum and restart Hill Climbing from the perturbed state.
-3. **VNS (Variable Neighbourhood Search)**: Enlarge or change the neighborhood operator ($N_1, N_2, \\dots, N_k$).
-4. **Simulated Annealing (SA)**: Accept worsening moves probabilistically according to the Metropolis criterion.
+When greedy Hill Climbing halts at a local optimum, metaheuristics apply four distinct escape mechanisms:
 
----
+| Strategy | Core Mechanism | Diversification Scope | Trajectory Retention | Typical Domain |
+| :--- | :--- | :--- | :--- | :--- |
+| **RLS (Random Restarts)** | Re-sample $x_0 \\sim U(S)$ uniformly at random | Global uncorrelated | Independent restarts; track $\\text{bestSoFar}$ | Smooth landscapes with many shallow basins |
+| **ILS (Iterated Local Search)** | Perturb current optimum: $x' = x^* \\oplus \\text{Perturb}(k)$ | Intermediate basin hop | Chained trajectory across adjacent basins | Combinatorial TSP, scheduling, packing |
+| **VNS (Variable Neighbourhood)** | Expand neighborhood operator: $N_1 \\to N_2 \\to \\dots \\to N_k$ | Progressive expansion | Same solution evaluated under larger operators | Two-processor balancing, routing |
+| **Simulated Annealing** | Accept worsening moves with probability $\\exp(-\\Delta / T)$ | Temperature-controlled | Continuous single trajectory with stochastic drift | Complex physical models, VLSI chip layout |
 
-### RLS vs. ILS Comparison
-- **RLS (Slide 32)**: Pure diversification. Discovers independent basins of attraction across distant parts of the search space.
-- **ILS (Slide 39–40)**: Intensified diversification. Perturbation operator applies a controlled jump ($k$ random moves) to escape the immediate basin without destroying the structural traits of the high-quality solution.`,
+#### RLS vs. ILS: Exploration vs. Structural Retention
+- **RLS (Slide 32)**: Pure, unguided diversification. Throws away all information learned during previous climbs and starts fresh from a new random coordinate.
+- **ILS (Slide 39–40)**: Structured diversification. The perturbation operator makes $k$ random moves to break free from the current attraction basin without destroying the high-quality structural "building blocks" of the candidate.`,
           keyTakeaways: [
             'RLS performs independent random restarts across the entire space.',
             'ILS perturbs the previous local optimum to explore adjacent high-quality basins.',
@@ -228,23 +232,33 @@ When Hill Climbing terminates at a local optimum, metaheuristics apply four dist
           title: 'Simulated Annealing & The Metropolis Criterion',
           slideRef: { lessonId: 'lesson-7', slideNumber: '48–52' },
           summary: 'Probabilistic worsening moves exp(-Δ/T) and geometric cooling schedules.',
-          content: `### The Physical Analogy & Metropolis Criterion (Slide 48–49)
+          content: `### The Physical Analogy & Metropolis Criterion (Slides 48–52)
 
-In metallurgy, annealing slowly cools molten metal so atoms arrange into a low-energy crystalline lattice. If cooled too fast (quenching), defects freeze in.
+In metallurgy, annealing slowly cools molten metal so atoms arrange into an optimal low-energy crystalline lattice. If cooled too abruptly (**quenching**), defects freeze in.
 
 #### The Metropolis Acceptance Criterion (Minimization)
-For a candidate neighbor $x' \\in N(x)$, define $\\Delta = f(x') - f(x)$:
+For a candidate neighbor $x' \\in N(x)$, define the energy difference $\\Delta = f(x') - f(x)$:
 $$P(\\text{accept } x') = \\begin{cases} 1 & \\text{if } \\Delta \\le 0 \\quad (\\text{improvement}) \\\\ \\exp(-\\Delta / T) & \\text{if } \\Delta > 0 \\quad (\\text{worsening move}) \\end{cases}$$
 
-- If $\\Delta \\le 0$, the move is **always accepted**.
-- If $\\Delta > 0$, generate random $u \\sim U(0, 1)$ and accept if $u \\le \\exp(-\\Delta / T)$.
+- If $\\Delta \\le 0$, the move is **always accepted** (100% deterministic improvement).
+- If $\\Delta > 0$, generate a uniform random number $u \\sim U[0, 1)$ and accept the worsening move if $u \\le \\exp(-\\Delta / T)$.
 
-#### Geometric Cooling Schedule (Slide 50–52)
-$$T_{t+1} = \\alpha T_t, \\quad 0 < \\alpha < 1 \\quad (\\text{typically } \\alpha \\in [0.85, 0.99])$$
+#### Worked Numerical Example (Metropolis Mechanics):
+Suppose a worsening move increases cost by $\\Delta = +2.5$:
+- **Initial high temperature ($T = 10.0$)**:
+  $$P(\\text{accept}) = \\exp(-2.5 / 10.0) = \\exp(-0.25) \\approx 0.779 \\quad (77.9\\% \\text{ chance to accept})$$
+- **Mid temperature ($T = 2.0$)**:
+  $$P(\\text{accept}) = \\exp(-2.5 / 2.0) = \\exp(-1.25) \\approx 0.287 \\quad (28.7\\% \\text{ chance to accept})$$
+- **Freezing temperature ($T = 0.5$)**:
+  $$P(\\text{accept}) = \\exp(-2.5 / 0.5) = \\exp(-5.0) \\approx 0.0067 \\quad (0.67\\% \\text{ chance to accept})$$
+- **Zero limit ($T \\to 0$)**: $P(\\text{accept}) \\to 0$. The algorithm degenerates strictly to greedy Hill Climbing!
 
-- At each temperature level $T$, $L$ movements are performed.
-- **High $T$**: $\\exp(-\\Delta / T) \\approx 1$. Worsening moves are accepted frequently; high exploration.
-- **Low $T \\to 0$**: $\\exp(-\\Delta / T) \\to 0$. Worsening moves are almost never accepted; converges to greedy Hill Climbing.`,
+#### Geometric Cooling Schedule (Slides 50–52):
+$$T_{t+1} = \\alpha T_t, \\quad \\alpha \\in [0.85, 0.99]$$
+
+At each temperature level $T_t$, the algorithm executes $L$ candidate evaluations to reach thermal equilibrium before cooling down.
+
+*Try this in the interactive Simulated Annealing & Metropolis Criterion Lab below: adjust temperature T and observe the live acceptance probability curve!*`,
           keyTakeaways: [
             'Accepts worse solutions with probability exp(-Δ / T) to escape deep local minima.',
             'High temperature encourages global exploration; low temperature enforces greedy exploitation.',

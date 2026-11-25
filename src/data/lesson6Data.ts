@@ -54,6 +54,16 @@ In **optimization problems**:
 2. **The Path is Irrelevant**: It does not matter what sequence of modifications was made to construct or reach the configuration.
 3. **No Recognizable Goal Known in Advance**: We do not possess a goal predicate $\\text{IsGoal}(s)$ to check against. Finding the best configuration **is** the entire problem!
 
+> ⚠️ **UCLM Exam Pitfall**: Students often attempt to apply tree search ($A^*$) to optimization problems. $A^*$ requires a known goal state or goal predicate to compute an admissible heuristic $h(n)$ estimating remaining path cost. In combinatorial optimization, we do not know what the optimal state looks like ahead of time—its objective score $f(c)$ is evaluated directly on the complete configuration. Furthermore, search trees grow to astronomical depths with leaf spaces exceeding $10^{100}$.
+
+| Dimension | Classical Path Search (Lessons 2–4) | Combinatorial Optimization (Lesson 6) |
+| :--- | :--- | :--- |
+| **Output** | Ordered sequence of actions $[a_0, a_1, \\dots, a_k]$ | A single static configuration $c = (x_1, \\dots, x_n)$ |
+| **Goal Criteria** | Predicate $\\text{IsGoal}(s) = \\text{True}$ | Extremize objective function $\\max f(c)$ or $\\min f(c)$ |
+| **Heuristic Function** | $h(n)$: Estimates remaining cost to reach goal | $f(c)$: Evaluates absolute quality of candidate |
+| **Search Tree Depth** | Path length $d$; pruned by branch-and-bound | Fixed number of variables $n$; leaf count $\\prod |D_i|$ |
+| **Primary Algorithms** | BFS, DFS, UCS, $A^*$, IDA* | Hill Climbing, Simulated Annealing, Genetic Algorithms |
+
 #### Why $A^*$ Cannot Be Used (Slide 9):
 Suppose we try to formulate parameter optimization as a search tree where each tree level sets one parameter:
 * If 100 parameters are discretized into 20 values each, the leaf level contains:
@@ -73,18 +83,28 @@ Suppose we try to formulate parameter optimization as a search tree where each t
           summary:
             'Examining real optimization domains: Formula 1 car setup (100+ parameters), BioBots reconfigurable organisms (448 polycubes), and NAO bipedal locomotion.',
           content: `
-### Case Study 1: Formula 1 Race Car Optimization (Slides 6–8)
+### Real-World Optimization Benchmarks (Slides 6–12, 40–42)
+
+Combinatorial optimization algorithms are deployed whenever system performance depends on complex, coupled configurations rather than finding paths through physical maps.
+
+| Benchmark Case | Domain | Variables $n$ & Domain | Search Space $|C|$ | Evaluation Cost & Simulator |
+| :--- | :--- | :--- | :--- | :--- |
+| **Formula 1 Setup** | Aerodynamics & Mechanical | 100+ continuous/discrete parameters | Multi-modal continuous | Multi-lap aerodynamic simulation (noisy, slow) |
+| **BioBots Organisms** | Synthetic Biology (*PNAS 2020*) | $8 \\times 8 \\times 7 = 448$ voxels $\\in \\{\\text{None}, \\text{Passive}, \\text{Contractile}\\}$ | $3^{448} \\approx 10^{213}$ discrete states | Biophysical finite-element physics engine |
+| **NAO Robot Walking** | Bipedal Locomotion (Slides 40–42) | 6 continuous kinematic gait angles | Infinite continuous ($\\mathbb{R}^6$) | Real-world physical test track with sensor timing |
+
+#### Deep Dive 1: Formula 1 Race Car Optimization (Slides 6–8)
 * **Goal**: Maximize average lap speed $\\equiv$ minimize total lap time on a specific circuit.
 * **Variables**: Over 100 numerical parameters interacting non-linearly: gear ratios, wing aerodynamics, damper stiffness, tire pressures, camber angles, brake balance.
 * **Evaluation Challenge**: Evaluating a single setup requires running multi-lap physics simulations that take significant CPU time and exhibit stochastic noise.
 
-### Case Study 2: Designing Reconfigurable Biological Organisms (BioBots) (Slides 10–12)
+#### Deep Dive 2: Designing Reconfigurable Biological Organisms (BioBots) (Slides 10–12)
 * Published in *PNAS (2020)* by Kriegman, Blackiston, Levin, and Bongard.
 * **Representation**: A 3D polycube structure of size $8 \\times 8 \\times 7 = 448$ discrete voxels.
 * **Domain**: Each voxel is assigned one of three tissue types: **None (empty)**, **Passive (scaffold)**, or **Contractile (heart muscle)**.
 * **Evaluation**: A biophysical simulator measures the locomotion speed and cargo transport capability of the resulting creature.
 
-### Case Study 3: Bipedal Walking in the NAO Robot (Slides 40–42)
+#### Deep Dive 3: Bipedal Walking in the NAO Robot (Slides 40–42)
 * **Parameters**: 6 continuous kinematic variables: \`singleSupportTime\`, \`stepHeight\`, \`maximumLength\`, \`bodyOffset\`, \`bodyPitchOffset\`, \`CoMHeight\`.
 * **Challenge**: Continuous variables yield an **infinite search space**, and every physical evaluation requires the physical robot to walk and measure elapsed time with sensors.
           `,
@@ -137,21 +157,30 @@ Every optimization problem requires defining:
           summary:
             'Comparing SAT and Max-SAT. Both share the exact same binary configuration space {0, 1}^n, but Max-SAT replaces a binary 0/1 step function with a smooth clause-satisfaction gradient.',
           content: `
-### SAT vs. Max-SAT (Slides 21–27)
+### SAT vs. Max-SAT: Informational Gradients (Slides 21–27)
 
-Given a Boolean formula in Conjunctive Normal Form (CNF) with $n$ variables and $m$ clauses:
+Given a Boolean formula in Conjunctive Normal Form (CNF) with $n$ boolean variables and $m$ disjunctive clauses:
 $$F = (x_1 \\lor \\neg x_2) \\land (\\neg x_1 \\lor \\neg x_2 \\lor \\neg x_3) \\land (x_1 \\lor x_2) \\dots$$
 
-Both problems share the exact same representation:
+Both problems share the exact same representation space:
 $$c = (x_1, x_2, \\dots, x_n) \\in \\{0, 1\\}^n, \\qquad |C| = 2^n$$
 
 #### How Their Evaluation Functions Differ (Slide 25):
-* **Standard SAT (Binary Evaluation)**:
-  $$f_{\\text{SAT}}(c) = \\begin{cases} 1 & \\text{if } c \\text{ satisfies all } m \\text{ clauses} \\\\ 0 & \\text{otherwise} \\end{cases}$$
-  * *The Needle in a Haystack*: A configuration satisfying 49 out of 50 clauses receives $f=0$, exactly the same score as one satisfying 0 clauses! There is zero gradient to guide search.
-* **Max-SAT (Gradual Evaluation)**:
-  $$f_{\\text{MaxSAT}}(c) = \\sum_{i=1}^m \\text{TruthValue}(\\text{clause}_i)$$
-  * *Smooth Guidance Landscape*: Satisfying 49 clauses ($f=49$) is recognized as substantially better than satisfying 20 clauses ($f=20$). Local search algorithms can follow the gradient toward the optimum!
+
+| Feature | Standard SAT (Decision / Step Function) | Max-SAT (Optimization / Gradient) |
+| :--- | :--- | :--- |
+| **Formula** | $f_{\\text{SAT}}(c) = \\begin{cases} 1 & \\text{if } \\forall i, \\text{clause}_i = 1 \\\\ 0 & \\text{otherwise} \\end{cases}$ | $f_{\\text{MaxSAT}}(c) = \\sum_{i=1}^m \\text{TruthValue}(\\text{clause}_i)$ |
+| **Output Domain** | Flat binary step: $\\{0, 1\\}$ | Granular integer gradient: $\\{0, 1, \\dots, m\\}$ |
+| **Landscape** | Needle in a haystack; flat zero plain everywhere except solution | Smooth, undulating mountain with slopes guiding local search |
+| **Guidance** | Zero gradient. 49/50 clauses satisfied gives $f=0$ (same as 0/50!) | Informative gradient. 49/50 gives $f=49$, rewarding progress |
+
+> 🔬 **The Phase Transition at $\\alpha = m/n \\approx 4.26$ (Slide 27)**:
+> In random 3-SAT benchmarks, problem difficulty does **not** scale monotonically with clause count $m$:
+> - **Under-constrained ($\\alpha < 4.0$)**: Clauses are sparse. Solutions are abundant; random search quickly finds a satisfying configuration.
+> - **Over-constrained ($\\alpha > 4.5$)**: Contradictions abound. Fast refutations and unit propagation quickly prove unsatisfiability.
+> - **The Phase Transition ($\\alpha \\approx 4.26$)**: The probability of satisfiability drops precipitously from $\\approx 100\\%$ to $0\\%$. At this razor edge, candidate configurations satisfy nearly all clauses except one or two subtle contradictions. This is where SAT solvers suffer exponential computation spikes!
+
+*Explore this live in the interactive laboratory below: flip variable switches and inspect the gate activation lines and phase transition curve!*
           `,
           keyTakeaways: [
             'SAT and Max-SAT share the identical search space of 2^n binary assignments.',
@@ -165,23 +194,26 @@ $$c = (x_1, x_2, \\dots, x_n) \\in \\{0, 1\\}^n, \\qquad |C| = 2^n$$
           summary:
             'Formulating vertex coloring with a fixed number of colors r as an integer vector c in {0, ..., r-1}^k, minimizing monochromatic edge conflicts.',
           content: `
-### Graph Coloring (Slides 28–30)
+### Graph Coloring: Fixed-r Combinatorial Formulation (Slides 28–30)
 
 Given an undirected graph $G = (V, E)$ with $k = |V|$ vertices:
 * **Vertex Coloring Goal**: Assign colors to vertices such that no two adjacent vertices share the same color.
-* **Chromatic Number $\\chi(G)$**: The minimum number of colors needed for a valid coloring.
+* **Chromatic Number $\\chi(G)$**: The theoretical minimum number of colors needed for a conflict-free coloring.
 
 #### The Fixed-$r$ Combinatorial Formulation (Slide 30):
-* **Representation**: Integer vector of length $k$:
-  $$c = (c_0, c_1, \\dots, c_{k-1}), \\quad c_i \\in \\{0, 1, \\dots, r-1\\}, \\quad |C| = r^k$$
-* **Evaluation Function**: Counts monochromatic edges (conflicts):
+* **Representation**: Integer vector $c = (c_0, c_1, \\dots, c_{k-1})$ where $c_i \\in \\{0, 1, \\dots, r-1\\}$. Search space: $|C| = r^k$.
+* **Evaluation Function (Penalty of Monochromatic Edges)**:
   $$f(c) = \\sum_{(i, j) \\in E} \\mathbb{I}[c_i = c_j]$$
-* **Optimization Criterion**:
-  $$c^* = \\arg\\min_{c \\in C} f(c)$$
+* **Optimization Criterion**: $c^* = \\arg\\min_{c \\in C} f(c)$.
 
-#### Interpretation:
-* If $f(c^*) = 0$: The graph is validly $r$-colorable!
-* To determine the chromatic number $\\chi(G)$, we test descending values of $r$ until no zero-conflict solution can be found.
+> 🗺️ **UCLM Regional Benchmark: The Castilla-La Mancha Map**:
+> Consider the 5 provinces of Castilla-La Mancha (Albacete, Ciudad Real, Cuenca, Guadalajara, Toledo):
+> - **Vertices**: $k=5$ provinces.
+> - **Borders (Edges)**: Toledo borders Ciudad Real, Cuenca, and Guadalajara. Ciudad Real borders Toledo, Cuenca, and Albacete. Cuenca borders all four other provinces!
+> - **Chromatic Number**: Because Ciudad Real, Toledo, and Cuenca form a mutual 3-clique ($K_3$), the map cannot be colored with $r=2$ colors ($\\chi(G) = 3$).
+> - **Combinatorial Space**: For $r=2$, $|C| = 2^5 = 32$ configurations (minimum conflicts $f^* = 1$). For $r=3$, $|C| = 3^5 = 243$ configurations, admitting valid conflict-free colorings ($f^* = 0$).
+
+*Test your own coloring intuition and run the Min-Conflicts local repair solver in the laboratory below!*
           `,
           keyTakeaways: [
             'In fixed-r graph coloring, configuration c is an integer vector with r^k search space.',
@@ -199,23 +231,25 @@ Given an undirected graph $G = (V, E)$ with $k = |V|$ vertices:
 
 Given $N$ cities and a distance matrix $D: N \\times N$:
 * **Representation**: Permutation $P = (c_0, c_1, \\dots, c_{N-1})$ of city indices.
-* **Evaluation**: Total tour length returning to start:
+* **Evaluation**: Total closed tour length returning to start:
   $$d_P = \\sum_{i=0}^{N-1} d(c_i, c_{(i+1) \\bmod N})$$
 
-#### Permutations vs. Unique Geometric Tours (Slide 34):
-* There are $N!$ total permutations.
-* A tour $A \\to B \\to C \\to D \\to A$ can be written with $N$ different starting cities: $(A, B, C, D)$, $(B, C, D, A)$, etc.
-* In **symmetric TSP** ($d(i, j) = d(j, i)$), traversing in reverse represents the identical tour!
-$$\\text{Total Unique Tours} = \\frac{N!}{2N} = \\frac{(N - 1)!}{2}$$
+#### Mathematical Derivation of Unique Tours (Slide 34):
+1. **Total Permutations**: There are $N!$ distinct ordered sequences.
+2. **Cyclic Shift Symmetry**: A closed tour $A \\to B \\to C \\to D \\to A$ can start at any of the $N$ cities: $(A, B, C, D)$, $(B, C, D, A)$, $(C, D, A, B)$, $(D, A, B, C)$. All represent the exact same physical cycle. Dividing by $N$ leaves $(N-1)!$ directed tours.
+3. **Reversal Symmetry (Symmetric TSP)**: When distances are symmetric ($d(i, j) = d(j, i)$), traversing the cycle clockwise versus counter-clockwise yields identical length. Dividing by 2 yields:
+   $$\\text{Unique Tours} = \\frac{N!}{2N} = \\frac{(N - 1)!}{2}$$
+
+> ⚠️ **UCLM Exam Note**: For **Asymmetric TSP** (ATSP, e.g., one-way streets or flights affected by jet streams, $d(i, j) \\ne d(j, i)$), reversing the direction produces a different physical cost. Therefore, ATSP has $(N - 1)!$ unique tours, NOT $(N - 1)! / 2$!
 
 | $N$ Cities | Permutations $N!$ | Unique Tours $\\frac{(N-1)!}{2}$ | Time at $10^6$ evals/sec |
-|:---|:---:|:---:|:---:|
+| :--- | :---: | :---: | :---: |
 | 5 | $120$ | $12$ | $< 1$ millisecond |
 | 10 | $3,628,800$ | $181,440$ | $0.18$ seconds |
 | 20 | $\\approx 2.43 \\times 10^{18}$ | $\\approx 6.08 \\times 10^{16}$ | $\\approx 1,928$ years |
 | 100 | $\\approx 9.33 \\times 10^{157}$ | $\\approx 4.67 \\times 10^{155}$ | $\\approx 3 \\times 10^{144}$ years |
 
-Exhaustive search is physically impossible for even moderate instances, proving the necessity of metaheuristics.
+Exhaustive search is physically impossible for even moderate instances, proving the absolute necessity of metaheuristic search.
           `,
           keyTakeaways: [
             'Symmetric TSP has (N-1)! / 2 unique physical tours after removing cyclic shifts and reversals.',
@@ -239,17 +273,21 @@ Exhaustive search is physically impossible for even moderate instances, proving 
           summary:
             'A heuristic is tailored to a single problem. A metaheuristic is a general search framework adapting representation, evaluation, and operators. Three families: Trajectory, Constructive, Population-based.',
           content: `
-### Definitions (Slide 45)
-* **Heuristic**: Problem-specific rule of thumb (e.g. Nearest Neighbor for TSP). Fast, but does not generalize to other problems.
-* **Metaheuristic**: A **general algorithmic framework** that can be instantiated for virtually any optimization problem by specifying:
+### Definitions & The Metaheuristics Taxonomy (Slides 45–49)
+
+* **Heuristic**: A problem-specific rule of thumb (e.g. Nearest Neighbor for TSP, most-constrained-variable in CSP). Fast, but completely bespoke and unable to transfer to different problems.
+* **Metaheuristic**: A **general, problem-independent algorithmic framework** providing high-level guidelines for exploring search spaces. To apply a metaheuristic to any arbitrary engineering problem, you only need to specify:
   1. A representation of candidate solutions;
   2. An evaluation function $f(c)$;
   3. Variation operators that generate or modify solutions.
 
-#### The Three Families of Metaheuristics (Slide 49):
-1. **Trajectory-Based**: Starts from a single candidate solution and moves through the search space iteratively along a trajectory (e.g., Hill Climbing, Simulated Annealing, Tabu Search).
-2. **Constructive**: Progressively builds a solution element-by-element using problem knowledge and randomness (e.g., Ant Colony Optimization, GRASP).
-3. **Population-Based**: Maintains a pool of diverse candidate solutions, recombining and mutating their information to produce superior generations (e.g., Genetic Algorithms, Evolutionary Strategies).
+#### The Three Canonical Families of Metaheuristics (Slide 49):
+
+| Family | Working Memory | State Maintained | Solution Assembly | Canonical Examples |
+| :--- | :---: | :--- | :--- | :--- |
+| **Trajectory-Based** | $O(1)$ | Single point $x_t \\in C$ evolving over iterations | Complete candidate modified locally via neighborhood $N(x)$ | Hill Climbing, Simulated Annealing, Tabu Search, VNS, ILS |
+| **Constructive** | $O(n)$ | Partial candidate extended incrementally | Piece-by-piece greedy selection with probabilistic guidance | Ant Colony Optimization (ACO), GRASP |
+| **Population-Based** | $O(N)$ | Pool of candidates $P(t) = \\{x_1, \\dots, x_N\\}$ | Complete candidates recombined via crossover & perturbed via mutation | Genetic Algorithms (GA), Evolution Strategies, Particle Swarm |
           `,
           keyTakeaways: [
             'Metaheuristics provide problem-independent algorithmic templates.',
@@ -263,19 +301,17 @@ Exhaustive search is physically impossible for even moderate instances, proving 
           summary:
             'Intensification thoroughly explores promising neighborhood basins; Diversification ensures distant unexplored regions are visited to prevent premature convergence.',
           content: `
-### The Core Balancing Act (Slides 47–48, 50)
+### The Core Balancing Act: Intensification vs. Diversification (Slides 47–50)
 
 Every effective optimization algorithm must strike a balance between two opposing forces:
 
-#### 1. Intensification (Exploitation)
-* **Definition**: Concentrating search effort around currently promising solutions to refine and climb local peaks.
-* **Mechanism**: Small neighborhood modifications, greedy improvements, gradient descent.
-* **Risk if excessive**: Premature convergence—the algorithm gets trapped permanently in a mediocre local optimum!
+| Force | Purpose | Typical Operators / Controls | Failure Mode if Excessive |
+| :--- | :--- | :--- | :--- |
+| **Intensification (Exploitation)** | Focus search on the immediate neighborhood of known high-quality solutions to climb peaks | Greedy local moves, steepest ascent, small step sizes, low temperature ($T \\to 0$) | **Premature Convergence**: Trapped in suboptimal local basins |
+| **Diversification (Exploration)** | Force search across broad, unexplored regions of configuration space to escape local traps | Large mutations, random restarts (RLS), high temperature in Simulated Annealing | **Random Walk**: Computation wasted without refining promising solutions |
 
-#### 2. Diversification (Exploration)
-* **Definition**: Forcing the search to visit distant, unexplored regions of the configuration space.
-* **Mechanism**: Random jumps, mutations, high acceptance temperature in annealing, random restarts.
-* **Risk if excessive**: Pure random search—the algorithm wastes all its computational budget wandering aimlessly without polishing high-quality candidates.
+> ⚖️ **The Dynamic Shift Principle (Slide 50)**:
+> The highest-performing metaheuristics do **not** maintain a static balance. Instead, they begin with **dominant diversification** (exploring broadly to identify multiple high-potential basins across the search landscape) and smoothly shift towards **dominant intensification** (refining and polishing the best discovered candidate to numerical precision). This principle is seen in Simulated Annealing (cooling temperature), Genetic Algorithms (loss of population diversity over generations), and ILS/VNS (alternating perturbation and local climbing).
           `,
           keyTakeaways: [
             'Intensification exploits known good regions; Diversification explores novel regions.',

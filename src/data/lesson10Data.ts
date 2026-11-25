@@ -39,23 +39,30 @@ export const LESSON_10_DATA: LessonData = {
           title: 'The k-NN Algorithm & Lazy Learning',
           slideRef: { lessonId: 'lesson-10', slideNumber: '1–14' },
           summary: 'Instance-based classification via neighborhood proximity.',
-          content: `### The k-Nearest Neighbors Algorithm
+          content: `### The k-Nearest Neighbors Algorithm (Slides 1–14)
 
 $k$-NN is a **non-parametric lazy learning** algorithm:
-- It requires **no explicit training phase** (it simply stores the training instances in memory).
-- All computation occurs at **query time**, when a new unlabeled instance $x_q$ must be classified.
+- It requires **no explicit training phase**; it simply indexes and stores the training instances in memory.
+- All computation occurs at **query time**, when an unlabeled instance $x_q$ must be classified.
 
-#### Algorithm Steps
-1. Compute the distance between query point $x_q$ and every point $x_i$ in training set $\\mathcal{D}$.
-   - **Euclidean Distance ($L_2$)**:
-     $$d(x_q, x_i) = \\sqrt{\\sum_{j=1}^d (x_{q,j} - x_{i,j})^2}$$
-   - **Manhattan Distance ($L_1$)**:
-     $$d(x_q, x_i) = \\sum_{j=1}^d |x_{q,j} - x_{i,j}|$$
-2. Identify the $k$ training points with the smallest distances to $x_q$: $N_k(x_q)$.
-3. Assign $x_q$ to the majority class among its $k$ neighbors:
-   $$\\hat{y} = \\arg\\max_{c} \\sum_{x_i \\in N_k(x_q)} \\mathbb{I}[y_i = c]$$
+#### Distance Metrics & Decision Geometries:
 
-> **Practical Guideline**: For binary classification, choose an **odd value of $k$** (e.g., $k=1, 3, 5, 7$) to prevent 50/50 vote ties.`,
+| Metric | Mathematical Formula | Unit Circle Contour Shape | Use Case / Sensitivity |
+| :--- | :--- | :--- | :--- |
+| **Euclidean ($L_2$)** | $d(x_q, x_i) = \\sqrt{\\sum_{j=1}^d (x_{q,j} - x_{i,j})^2}$ | Circular disk ($x^2 + y^2 \\le r^2$) | Continuous physical coordinates; isotropic sensitivity |
+| **Manhattan ($L_1$)** | $d(x_q, x_i) = \\sum_{j=1}^d \\|x_{q,j} - x_{i,j}\\|$ | 45° diamond ($|x| + |y| \\le r$) | Grid street networks; high-dimensional sparse data |
+| **Chebyshev ($L_\\infty$)** | $d(x_q, x_i) = \\max_j \\|x_{q,j} - x_{i,j}\\|$ | Axis-aligned square ($\\max(|x|, |y|) \\le r$) | Chess king moves; worst-case coordinate tolerance |
+
+> ⚠️ **UCLM Exam Pitfall: Mandatory Feature Normalization**:
+> Distance metrics are hypersensitive to scale! Suppose feature 1 is Age (range $20\\text{--}60$, span 40) and feature 2 is Annual Income (range $20,000\\text{--}100,000$, span 80,000). A difference of $100 in salary produces squared distance $10,000$, completely obliterating any 30-year age difference! **Features must always be normalized (Min-Max to $[0, 1]$ or Z-score $\\mu=0, \\sigma=1$) before computing distances.**
+
+#### Voting Rules:
+1. **Majority Voting (Standard)**: Each of the $k$ nearest neighbors casts one unweighted vote:
+   $$\\hat{y} = \\arg\\max_c \\sum_{x_i \\in N_k(x_q)} \\mathbb{I}[y_i = c]$$
+2. **Distance-Weighted Voting (Inverse Distance)**: Closer neighbors exert stronger gravitational pull:
+   $$w_i = \\frac{1}{d(x_q, x_i)^2 + \\epsilon}, \\qquad \\hat{y} = \\arg\\max_c \\sum_{x_i \\in N_k(x_q)} w_i \\cdot \\mathbb{I}[y_i = c]$$
+
+*Interact with the 2D coordinate space below: drag the query target, toggle distance metrics (Euclidean, Manhattan, Chebyshev), and observe the live contour lines!*`,
           keyTakeaways: [
             'k-NN stores training examples and performs inference by finding the k closest neighbors.',
             'Euclidean distance is standard, but features must be normalized to prevent dominance by large scales.',
@@ -99,21 +106,29 @@ The choice of hyperparameter $k$ directly controls the bias-variance tradeoff:
           title: 'Shannon Entropy and Information Gain (ID3)',
           slideRef: { lessonId: 'lesson-10', slideNumber: '29–42' },
           summary: 'Mathematical quantification of data impurity and tree splitting.',
-          content: `### Shannon Entropy: Measuring Impurity
+          content: `### Shannon Entropy & Information Gain (ID3) (Slides 29–42)
 
-For a dataset $S$ containing samples from classes with proportions $p_1, \\dots, p_C$:
+Decision trees recursively partition the input space by choosing attributes that create the purest child subsets.
+
+#### 1. Shannon Entropy: Quantifying Impurity
+For a dataset $S$ containing samples with class proportions $p_1, \\dots, p_C$:
 $$H(S) = - \\sum_{i=1}^C p_i \\log_2(p_i) \\quad (\\text{with } 0 \\log_2 0 = 0)$$
 
-- **Pure Node ($p_1 = 1, p_2 = 0$)**: $H(S) = 0$ bits (no uncertainty).
-- **Maximum Impurity ($p_1 = 0.5, p_2 = 0.5$)**: $H(S) = 1.0$ bit (maximum uncertainty).
+- **Completely Pure Node ($p_1 = 1.0, p_2 = 0.0$)**: $H(S) = 0$ bits (zero uncertainty).
+- **Evenly Split 50/50 Node ($p_1 = 0.5, p_2 = 0.5$)**: $H(S) = - (0.5 \\log_2 0.5 + 0.5 \\log_2 0.5) = 1.0$ bit (maximum uncertainty).
+
+#### Worked Numerical Calculation (Slide 34):
+Consider a training node with 14 instances: 9 Positive ($+$) and 5 Negative ($-$).
+$$p_+ = \\frac{9}{14} \\approx 0.643, \\qquad p_- = \\frac{5}{14} \\approx 0.357$$
+$$H(S) = - \\left(0.643 \\log_2(0.643) + 0.357 \\log_2(0.357)\\right) = - (-0.409 - 0.531) = 0.940 \\text{ bits}$$
 
 ---
 
-### Information Gain: Selecting the Best Split
-When splitting dataset $S$ on attribute $A$ into subsets $S_v$ for each value $v \\in \\text{Values}(A)$:
+#### 2. Information Gain: Selecting the Best Attribute
+When partitioning dataset $S$ along attribute $A$ having discrete values $v \\in \\text{Values}(A)$:
 $$IG(S, A) = H(S) - \\sum_{v \\in \\text{Values}(A)} \\frac{|S_v|}{|S|} H(S_v)$$
 
-The algorithm greedily selects the attribute that **maximizes Information Gain** at each node until all leaf nodes are pure or stopping criteria are satisfied.`,
+The ID3 algorithm greedily selects the attribute $A^* = \\arg\\max_A IG(S, A)$ that maximizes Information Gain (the largest reduction in entropy).`,
           keyTakeaways: [
             'Entropy measures uncertainty: 0 bits for completely pure, 1 bit for evenly split 50/50.',
             'Information Gain measures the reduction in entropy achieved by partitioning on attribute A.',
@@ -159,30 +174,33 @@ In binary classification (Positive vs. Negative):
           title: 'Evaluation Metrics & The Accuracy Paradox',
           slideRef: { lessonId: 'lesson-10', slideNumber: '51–60' },
           summary: 'Accuracy, Precision, Recall, F1-score, and why Accuracy fails on imbalanced data.',
-          content: `### Core Metric Formulas
+          content: `### Evaluation Metrics & The Accuracy Paradox (Slides 51–60)
 
-1. **Accuracy**:
-   $$\\text{Accuracy} = \\frac{TP + TN}{TP + TN + FP + FN}$$
-2. **Precision (Positive Predictive Value)**:
-   $$\\text{Precision} = \\frac{TP}{TP + FP}$$
-   - *Question answered*: "When the model predicts positive, how often is it actually correct?"
-3. **Recall / Sensitivity (True Positive Rate)**:
-   $$\\text{Recall} = \\frac{TP}{TP + FN}$$
-   - *Question answered*: "Out of all actual positive cases in reality, how many did the model catch?"
-4. **Specificity (True Negative Rate)**:
-   $$\\text{Specificity} = \\frac{TN}{TN + FP}$$
-5. **$F_1$-Score (Harmonic Mean of Precision and Recall)**:
-   $$F_1 = 2 \\times \\frac{\\text{Precision} \\times \\text{Recall}}{\\text{Precision} + \\text{Recall}} = \\frac{2 \\cdot TP}{2 \\cdot TP + FP + FN}$$
+Evaluating classification algorithms requires matching the metric to the real-world cost asymmetry between Type I ($FP$) and Type II ($FN$) errors.
+
+#### Comprehensive Metric Reference Table:
+
+| Metric | Mathematical Formula | Question Answered | High-Stakes Domain Where Critical |
+| :--- | :--- | :--- | :--- |
+| **Accuracy** | $\\frac{TP + TN}{TP + TN + FP + FN}$ | What overall fraction of cases did we classify correctly? | Symmetric, balanced classes; baseline sanity check |
+| **Precision** | $\\frac{TP}{TP + FP}$ | When the model triggers an alarm, how often is it actually true? | Spam filters, charging a suspect, automated financial trading |
+| **Recall / Sensitivity** | $\\frac{TP}{TP + FN}$ | Out of all actual positive cases in reality, how many did we catch? | Medical cancer screening, virus testing, airport weapon detection |
+| **Specificity** | $\\frac{TN}{TN + FP}$ | Out of all healthy/normal individuals, how many were correctly cleared? | Minimizing unnecessary traumatic biopsies, drug trials |
+| **$F_1$-Score** | $2 \\cdot \\frac{\\text{Precision} \\cdot \\text{Recall}}{\\text{Precision} + \\text{Recall}}$ | What is the harmonic balance between Precision and Recall? | Class-imbalanced machine learning benchmarks |
 
 ---
 
-### The Accuracy Paradox in Class Imbalance
-Consider a rare disease present in $1\\%$ of patients (990 healthy, 10 sick).
-- A **dumb trivial classifier** that predicts "Healthy" for every single person achieves:
-  $$\\text{Accuracy} = \\frac{0 + 990}{1000} = 99.0\\%!$$
-- Yet its Recall is:
-  $$\\text{Recall} = \\frac{0}{0 + 10} = 0\\%!$$
-- The model is utterly useless in a clinic. **In imbalanced domains, never rely on Accuracy alone; evaluate Precision, Recall, and $F_1$-score!**`,
+### The Accuracy Paradox in Class Imbalance (Slide 55)
+Consider a rare disease present in $1\\%$ of the population ($N=1,000$: 990 healthy, 10 sick):
+
+| Classifier Strategy | Predicted Sick | Predicted Healthy | Accuracy | Recall | Utility in Clinic |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Trivial "Predict All Healthy"** | 0 | 1,000 | **$99.0\\%$** | **$0.0\\%$** | **Utterly useless**; all 10 sick patients die |
+| **Trained Clinical Model** | 25 | 975 | **$98.5\\%$** | **$90.0\\%$** | **High value**; catches 9 of 10 sick patients |
+
+> ⚠️ **The Paradox**: The completely useless dummy model has **higher accuracy** ($99.0\\%$ vs $98.5\\%$) than the clinical model! **In class-imbalanced problems, Accuracy is deceptive. You must evaluate Precision, Recall, and the $F_1$-score.**
+
+*Explore this live in the interactive laboratory below: slide the classification threshold $\\theta$, inspect the live $2\\times 2$ confusion matrix, view the ROC operating point, and toggle the rare disease simulator!*`,
           keyTakeaways: [
             'Precision penalizes False Positives (crucial in spam filters, legal sentencing).',
             'Recall penalizes False Negatives (crucial in medical cancer screening, fraud detection).',
